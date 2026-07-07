@@ -56,7 +56,7 @@ WEB_UI_HTML = """<!doctype html>
     </div>
     <div class="row" id="sourceValueRow">
       <label for="sourceValue">PDF URL or path</label>
-      <input id="sourceValue" name="sourceValue" placeholder="https://.../file.pdf or /config/file.pdf (/homeassistant/... also supported)" />
+      <input id="sourceValue" name="sourceValue" placeholder="https://.../file.pdf or /config/file.pdf (/homeassistant/... also supported)" required />
       <span class="hint">Only PDF files are supported.</span>
     </div>
     <div class="row" id="fileUploadRow" hidden>
@@ -99,14 +99,17 @@ WEB_UI_HTML = """<!doctype html>
       latestJson = null;
 
       const payload = new FormData();
-      const basePath = window.location.pathname.replace(/\/+$/, '');
 
       try {
+        const basePath = window.location.pathname.replace(/\/+$/, '');
         let endpoint;
         if (sourceType.value === 'file_upload') {
           const file = fileInput.files[0];
           if (!file) {
             throw new Error('Please select a PDF file to upload');
+          }
+          if (file.type && file.type !== 'application/pdf') {
+            throw new Error('The selected file is not a PDF');
           }
           payload.append('file', file, file.name);
           endpoint = new URL(`${basePath}/ocr`, window.location.origin);
