@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.9
+- Added "Upload file" option to the Web UI, allowing users to upload a PDF directly from their device for analysis, in addition to the existing URL and local-path options.
+- The file-upload option shows a dedicated file picker (hidden when URL or local-path is selected) and posts directly to the existing `POST /ocr` endpoint.
+
 ## 0.2.8
 - Fixed Web UI PDF analysis requests under Home Assistant ingress by using a relative endpoint URL for `POST /ocr/source` instead of an absolute path.
 - Added backend error logging for `/ocr` and `/ocr/source` request failures, plus detailed logging when PDF conversion fails, to improve diagnostics in add-on logs.

@@ -14,7 +14,7 @@ from fastapi.responses import HTMLResponse
 from pdf2image import convert_from_bytes
 from paddleocr import PaddleOCR
 
-app = FastAPI(title="Concierge OCR API", version="0.2.8")
+app = FastAPI(title="Concierge OCR API", version="0.2.9")
 logger = logging.getLogger("concierge_ocr.api")
 
 _OCR_INSTANCE: PaddleOCR | None = None
@@ -39,22 +39,29 @@ WEB_UI_HTML = """<!doctype html>
     .row { display: grid; gap: .5rem; }
     .hint { color: #666; font-size: .9rem; }
     .actions { display: flex; gap: .5rem; flex-wrap: wrap; }
+    [hidden] { display: none !important; }
   </style>
 </head>
 <body>
   <h1>Concierge OCR Web UI</h1>
-  <p>Enter a URL (<code>http/https</code>) or a local path mounted in Home Assistant (<code>/config</code>, <code>/share</code>, <code>/media</code> or <code>/homeassistant</code> as alias of <code>/config</code>).</p>
+  <p>Enter a URL (<code>http/https</code>), a local path mounted in Home Assistant (<code>/config</code>, <code>/share</code>, <code>/media</code> or <code>/homeassistant</code> as alias of <code>/config</code>), or upload a PDF file directly.</p>
   <form id="ocrForm">
     <div class="row">
       <label for="sourceType">Source type</label>
       <select id="sourceType" name="sourceType">
         <option value="url">URL</option>
         <option value="local_path">Local path</option>
+        <option value="file_upload">Upload file</option>
       </select>
     </div>
-    <div class="row">
+    <div class="row" id="sourceValueRow">
       <label for="sourceValue">PDF URL or path</label>
       <input id="sourceValue" name="sourceValue" placeholder="https://.../file.pdf or /config/file.pdf (/homeassistant/... also supported)" required />
+      <span class="hint">Only PDF files are supported.</span>
+    </div>
+    <div class="row" id="fileUploadRow" hidden>
+      <label for="fileInput">PDF file</label>
+      <input id="fileInput" name="fileInput" type="file" accept=".pdf,application/pdf" />
       <span class="hint">Only PDF files are supported.</span>
     </div>
     <div class="actions">
@@ -70,9 +77,20 @@ WEB_UI_HTML = """<!doctype html>
     const form = document.getElementById('ocrForm');
     const sourceType = document.getElementById('sourceType');
     const sourceValue = document.getElementById('sourceValue');
+    const fileInput = document.getElementById('fileInput');
+    const sourceValueRow = document.getElementById('sourceValueRow');
+    const fileUploadRow = document.getElementById('fileUploadRow');
     const result = document.getElementById('result');
     const downloadBtn = document.getElementById('downloadBtn');
     let latestJson = null;
+
+    sourceType.addEventListener('change', () => {
+      const isUpload = sourceType.value === 'file_upload';
+      sourceValueRow.hidden = isUpload;
+      fileUploadRow.hidden = !isUpload;
+      sourceValue.required = !isUpload;
+      fileInput.required = isUpload;
+    });
 
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
@@ -81,12 +99,26 @@ WEB_UI_HTML = """<!doctype html>
       latestJson = null;
 
       const payload = new FormData();
-      payload.append('source_type', sourceType.value);
-      payload.append('source_value', sourceValue.value.trim());
 
       try {
         const basePath = window.location.pathname.replace(/\/+$/, '');
-        const endpoint = new URL(`${basePath}/ocr/source`, window.location.origin);
+        let endpoint;
+        if (sourceType.value === 'file_upload') {
+          const file = fileInput.files[0];
+          if (!file) {
+            throw new Error('Please select a PDF file to upload');
+          }
+          if (file.type && file.type !== 'application/pdf') {
+            throw new Error('The selected file is not a PDF');
+          }
+          payload.append('file', file, file.name);
+          endpoint = new URL(`${basePath}/ocr`, window.location.origin);
+        } else {
+          payload.append('source_type', sourceType.value);
+          payload.append('source_value', sourceValue.value.trim());
+          endpoint = new URL(`${basePath}/ocr/source`, window.location.origin);
+        }
+
         const response = await fetch(endpoint, { method: 'POST', body: payload });
         const data = await response.json();
         if (!response.ok) {
