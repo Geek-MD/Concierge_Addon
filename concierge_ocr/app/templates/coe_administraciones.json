@@ -1,5 +1,5 @@
 {
-  "template_id": "template_coe_administraciones",
+  "template_id": "coe_administraciones",
   "document_type": "gasto_comun",
   "matching": {
     "normalize_accents": true,
