@@ -28,7 +28,7 @@ The runtime dependencies explicitly include `paddlepaddle` to ensure `paddleocr`
   - `Dockerfile`: add-on image.
   - `run.sh`: API startup script.
   - `requirements.txt`: Python dependencies.
-  - `app/main.py`: REST API (`/health`, `/ocr`, `/ocr/source`) and Web UI (`/`).
+  - `app/main.py`: REST API (`/health`, `/templates`, `/ocr`, `/ocr/source`) and Web UI (`/`).
 
 ## Usage
 
@@ -55,6 +55,13 @@ curl -X POST "http://HOME_ASSISTANT_HOST:8099/ocr" \
 ```
 
 Raw PDF content in the request body is also supported (`Content-Type: application/pdf`).
+
+Optional query params:
+
+- `template_id=<builtin_template_id>`
+- `template_json=<json_template_string>`
+
+When one of these template parameters is provided, the endpoint returns a structured JSON output (section-based) instead of the raw OCR payload.
 
 Example response:
 
@@ -85,3 +92,58 @@ Allows processing a PDF from a remote or local source:
 - `source_type=url` and `source_value=https://.../file.pdf`
 - `source_type=local_path` and `source_value=/config/file.pdf`
 - `source_type=local_path` and `source_value=/homeassistant/file.pdf` (alias to `/config/file.pdf`)
+
+Optional form fields:
+
+- `template_id`
+- `template_json`
+
+If provided, the OCR result is transformed into a template-structured output.
+
+### `GET /templates`
+
+Lists built-in template IDs available for `template_id`.
+
+### Template shape (`template_json`)
+
+Templates now represent real PDF sections explicitly:
+
+- `sections[]`: each logical/visual section in the PDF.
+- `sections[].lines[]`: logical lines inside the section.
+- `sections[].lines[].boxes[]`: text boxes with semantic `role`.
+
+Supported `role` values:
+
+- `fixed`: canonical label text (supports fuzzy matching and overwrite of OCR text).
+- `variable`: value that changes from PDF to PDF and is associated using `locator.strategy`.
+- `ignore`: currently ignored in output.
+
+Minimal example:
+
+```json
+{
+  "template_id": "gasto_comun_v1",
+  "document_type": "gasto_comun",
+  "matching": {
+    "normalize_accents": true,
+    "ignore_case": true,
+    "collapse_whitespace": true,
+    "default_fuzzy_threshold": 0.82
+  },
+  "sections": [
+    {
+      "id": "datos_comunidad",
+      "anchors": ["Comunidad", "Dirección", "Fecha de último pago"],
+      "lines": [
+        {
+          "id": "linea_comunidad",
+          "boxes": [
+            { "role": "fixed", "key": "comunidad_label", "canonical_text": "Comunidad", "overwrite_ocr_text": true },
+            { "role": "variable", "key": "comunidad", "locator": { "strategy": "nearest_right_or_below", "max_distance": 2 } }
+          ]
+        }
+      ]
+    }
+  ]
+}
+```
