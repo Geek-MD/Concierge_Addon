@@ -1,6 +1,6 @@
 # Concierge addon
 
-[![Publish](https://github.com/Geek-MD/Concierge_addon/actions/workflows/publish.yml/badge.svg)](https://github.com/Geek-MD/Concierge_addon/actions/workflows/publish.yml)
+[![Code Quality](https://github.com/Geek-MD/Concierge_addon/actions/workflows/code-quality.yml/badge.svg)](https://github.com/Geek-MD/Concierge_addon/actions/workflows/code-quality.yml)
 [![Release](https://img.shields.io/github/v/release/Geek-MD/Concierge_addon.svg)](https://github.com/Geek-MD/Concierge_addon/releases)
 [![Stars](https://img.shields.io/github/stars/Geek-MD/Concierge_addon.svg)](https://github.com/Geek-MD/Concierge_addon/stargazers)
 
