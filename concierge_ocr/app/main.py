@@ -166,6 +166,123 @@ DEFAULT_TEMPLATE: dict[str, Any] = {
     },
     "sections": [
         {
+            "id": "pago_en_linea",
+            "name": "Pago en línea",
+            "anchors": [
+                "Paga tu Gasto Común en línea",
+                "pagos.kastor.cl",
+                "Código cliente",
+            ],
+            "min_score": 0.78,
+            "lines": [
+                {
+                    "id": "linea_paga_gasto_comun",
+                    "boxes": [
+                        {
+                            "role": "ignore",
+                            "canonical_text": "Paga tu Gasto Común en línea",
+                            "required": False,
+                        }
+                    ],
+                },
+                {
+                    "id": "linea_url_kastor",
+                    "boxes": [
+                        {
+                            "role": "ignore",
+                            "canonical_text": "pagos.kastor.cl",
+                            "required": False,
+                        }
+                    ],
+                },
+                {
+                    "id": "linea_codigo_cliente",
+                    "boxes": [
+                        {
+                            "role": "ignore",
+                            "canonical_text": "Código cliente",
+                            "required": False,
+                        }
+                    ],
+                },
+            ],
+        },
+        {
+            "id": "fechas_emision",
+            "name": "Fechas de emisión",
+            "anchors": [
+                "Fecha Emisión",
+                "Pagar Hasta",
+            ],
+            "min_score": 0.78,
+            "lines": [
+                {
+                    "id": "linea_coe",
+                    "boxes": [
+                        {
+                            "role": "ignore",
+                            "canonical_text": "COE",
+                            "required": False,
+                        }
+                    ],
+                },
+                {
+                    "id": "linea_administraciones",
+                    "boxes": [
+                        {
+                            "role": "ignore",
+                            "canonical_text": "ADMINISTRACIONES",
+                            "required": False,
+                        }
+                    ],
+                },
+                {
+                    "id": "linea_fecha_emision",
+                    "boxes": [
+                        {
+                            "role": "fixed",
+                            "key": "fecha_emision_label",
+                            "canonical_text": "Fecha Emisión",
+                            "required": True,
+                            "overwrite_ocr_text": True,
+                        },
+                        {
+                            "role": "variable",
+                            "key": "fecha_emision",
+                            "value_type": "date",
+                            "required": False,
+                            "locator": {
+                                "strategy": "nearest_right_or_below",
+                                "max_distance": 2,
+                            },
+                        },
+                    ],
+                },
+                {
+                    "id": "linea_pagar_hasta",
+                    "boxes": [
+                        {
+                            "role": "fixed",
+                            "key": "pagar_hasta_label",
+                            "canonical_text": "Pagar Hasta",
+                            "required": True,
+                            "overwrite_ocr_text": True,
+                        },
+                        {
+                            "role": "variable",
+                            "key": "pagar_hasta",
+                            "value_type": "date",
+                            "required": False,
+                            "locator": {
+                                "strategy": "nearest_right_or_below",
+                                "max_distance": 2,
+                            },
+                        },
+                    ],
+                },
+            ],
+        },
+        {
             "id": "datos_comunidad",
             "name": "Datos de la comunidad",
             "anchors": [
