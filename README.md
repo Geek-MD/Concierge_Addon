@@ -125,6 +125,7 @@ The API also accepts a shorthand schema where each line uses a simple `type`:
 
 - `fixed`: static text anchor
 - `mixed`: static + variable in one line, where `?` marks the variable segment(s)
+- `ignore`: line intentionally skipped from extraction
 
 Example:
 
@@ -136,7 +137,8 @@ Example:
     "lines": [
       { "text": "¡Paga tu Gasto Común en línea!", "type": "fixed" },
       { "text": "Ingresa a: https://pagos.kastor.cl", "type": "fixed" },
-      { "text": "Código cliente: ??????-?????", "type": "mixed", "key": "codigo_cliente" }
+      { "text": "Código cliente: ??????-?????", "type": "mixed", "key": "codigo_cliente" },
+      { "text": "44121821052026", "type": "ignore" }
     ]
   }
 }

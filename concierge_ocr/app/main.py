@@ -693,6 +693,15 @@ def _coerce_template_schema(template: dict[str, Any]) -> dict[str, Any]:
                 )
                 continue
 
+            if role_type == "ignore":
+                coerced_lines.append(
+                    {
+                        "id": f"line_{line_index}",
+                        "boxes": [{"role": "ignore", "key": key or f"ignore_{line_index}"}],
+                    }
+                )
+                continue
+
             variable_key = key or _slugify_key(text, f"variable_{line_index}")
             coerced_lines.append(
                 {
