@@ -169,76 +169,50 @@ DEFAULT_TEMPLATE: dict[str, Any] = {
             "id": "datos_comunidad",
             "name": "Datos de la comunidad",
             "anchors": [
-                "Comunidad",
-                "Dirección",
-                "Fecha de último pago",
+                "Edificio",
+                "RUT",
+                "Fono",
             ],
-            "min_score": 0.8,
+            "min_score": 0.78,
             "lines": [
                 {
-                    "id": "linea_comunidad",
+                    "id": "linea_nombre_edificio",
                     "boxes": [
                         {
-                            "role": "fixed",
-                            "key": "comunidad_label",
-                            "canonical_text": "Comunidad",
-                            "required": True,
-                            "overwrite_ocr_text": True,
-                        },
-                        {
-                            "role": "variable",
-                            "key": "comunidad",
-                            "value_type": "string",
-                            "required": False,
-                            "locator": {
-                                "strategy": "nearest_right_or_below",
-                                "max_distance": 2,
-                            },
-                        },
+                            "role": "mixed",
+                            "key": "nombre_edificio",
+                            "text": "Edificio ????",
+                        }
                     ],
                 },
                 {
-                    "id": "linea_direccion",
+                    "id": "linea_rut",
                     "boxes": [
                         {
-                            "role": "fixed",
-                            "key": "direccion_label",
-                            "canonical_text": "Dirección",
-                            "required": True,
-                            "overwrite_ocr_text": True,
-                        },
-                        {
-                            "role": "variable",
-                            "key": "direccion",
-                            "value_type": "string",
-                            "required": False,
-                            "locator": {
-                                "strategy": "nearest_right_or_below",
-                                "max_distance": 2,
-                            },
-                        },
+                            "role": "mixed",
+                            "key": "rut",
+                            "text": "RUT: ????????-?",
+                        }
                     ],
                 },
                 {
-                    "id": "linea_fecha_ultimo_pago",
+                    "id": "linea_fono",
                     "boxes": [
                         {
-                            "role": "fixed",
-                            "key": "fecha_ultimo_pago_label",
-                            "canonical_text": "Fecha de último pago",
-                            "required": True,
-                            "overwrite_ocr_text": True,
-                        },
+                            "role": "mixed",
+                            "key": "fono",
+                            "text": "Fono: ?????????",
+                        }
+                    ],
+                },
+                {
+                    "id": "linea_administracion",
+                    "boxes": [
                         {
-                            "role": "variable",
-                            "key": "fecha_ultimo_pago",
-                            "value_type": "date",
+                            "role": "ignore",
+                            "canonical_text": "Administración",
                             "required": False,
-                            "locator": {
-                                "strategy": "nearest_right_or_below",
-                                "max_distance": 2,
-                            },
-                        },
+                        }
                     ],
                 },
             ],
@@ -263,7 +237,7 @@ DEFAULT_TEMPLATE: dict[str, Any] = {
                         {
                             "role": "mixed",
                             "key": "nota_cobro_mes_depto",
-                            "text": "Nota de Cobro Mes ???? Depto. ???",
+                            "text": "Nota de Cobro ???? Depto. ???",
                         }
                     ],
                 },
