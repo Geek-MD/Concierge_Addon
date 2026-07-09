@@ -221,7 +221,7 @@ DEFAULT_TEMPLATE: dict[str, Any] = {
             "id": "tabla_nota_cobro",
             "name": "Tabla nota de cobro",
             "anchors": [
-                "Nota de Cobro Mes",
+                "Nota de Cobro",
                 "Copropietario",
                 "Fecha último Pago",
                 "Alícuota Total",
@@ -237,7 +237,7 @@ DEFAULT_TEMPLATE: dict[str, Any] = {
                         {
                             "role": "mixed",
                             "key": "nota_cobro_mes_depto",
-                            "text": "Nota de Cobro ???? Depto. ???",
+                            "text": "Nota de Cobro ??? ???? Depto. ???",
                         }
                     ],
                 },
