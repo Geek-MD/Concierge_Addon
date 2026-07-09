@@ -98,7 +98,7 @@ WEB_UI_HTML = """<!doctype html>
     let latestJson = null;
 
     async function loadTemplates() {
-      const basePath = window.location.pathname.replace(/\/+$/, '');
+      const basePath = window.location.pathname.replace(/\\/+$/, '');
       const endpoint = new URL(`${basePath}/templates`, window.location.origin);
       const response = await fetch(endpoint);
       const data = await response.json();
@@ -133,7 +133,7 @@ WEB_UI_HTML = """<!doctype html>
       const payload = new FormData();
 
       try {
-        const basePath = window.location.pathname.replace(/\/+$/, '');
+        const basePath = window.location.pathname.replace(/\\/+$/, '');
         let endpoint;
         const selectedTemplate = templateId.value;
         if (sourceType.value === 'file_upload') {
@@ -622,9 +622,10 @@ def _detect_best_template(
     best_score = 0.0
 
     for template in builtin_templates.values():
-        matching_cfg = template.get("matching", {})
+        candidate_template = _coerce_template_schema(template)
+        matching_cfg = candidate_template.get("matching", {})
         flattened_lines = _flatten_ocr_lines(raw_payload, matching_cfg)
-        sections = template.get("sections", [])
+        sections = candidate_template.get("sections", [])
         if not sections:
             continue
 
@@ -639,7 +640,7 @@ def _detect_best_template(
         template_score = sum(section_scores) / len(section_scores)
         if template_score > best_score:
             best_score = template_score
-            best_template = template
+            best_template = candidate_template
 
     if best_template is not None and best_score >= min_score:
         logger.info(
