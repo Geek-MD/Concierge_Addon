@@ -28,7 +28,7 @@ RESOLVED_LOCAL_BASE_DIRS = tuple(
     path.expanduser().resolve() for path in LOCAL_ALLOWED_BASE_DIRS if path.expanduser().exists()
 )
 
-WEB_UI_HTML = """<!doctype html>
+WEB_UI_HTML = r"""<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
@@ -98,7 +98,7 @@ WEB_UI_HTML = """<!doctype html>
     let latestJson = null;
 
     async function loadTemplates() {
-      const basePath = window.location.pathname.replace(/[/]+$/, '');
+      const basePath = window.location.pathname.replace(/\/+$/, '');
       const endpoint = new URL(`${basePath}/templates`, window.location.origin);
       const response = await fetch(endpoint);
       const data = await response.json();
@@ -133,7 +133,7 @@ WEB_UI_HTML = """<!doctype html>
       const payload = new FormData();
 
       try {
-        const basePath = window.location.pathname.replace(/[/]+$/, '');
+        const basePath = window.location.pathname.replace(/\/+$/, '');
         let endpoint;
         const selectedTemplate = templateId.value;
         if (sourceType.value === 'file_upload') {
