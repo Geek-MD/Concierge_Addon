@@ -625,15 +625,15 @@ def _detect_best_template(
         candidate_template = _coerce_template_schema(template)
         matching_cfg = candidate_template.get("matching", {})
         flattened_lines = _flatten_ocr_lines(raw_payload, matching_cfg)
-        sections = candidate_template.get("sections", [])
+        sections = [
+            section
+            for section in candidate_template.get("sections", [])
+            if isinstance(section, dict) and (section.get("anchors") or section.get("match", {}).get("anchors"))
+        ]
         if not sections:
             continue
 
-        section_scores = [
-            _section_anchor_score(section, flattened_lines, matching_cfg)[0]
-            for section in sections
-            if isinstance(section, dict)
-        ]
+        section_scores = [_section_anchor_score(section, flattened_lines, matching_cfg)[0] for section in sections]
         if not section_scores:
             continue
 
