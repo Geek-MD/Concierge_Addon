@@ -28,7 +28,7 @@ The runtime dependencies explicitly include `paddlepaddle` to ensure `paddleocr`
   - `Dockerfile`: add-on image.
   - `run.sh`: API startup script.
   - `requirements.txt`: Python dependencies.
-  - `app/main.py`: REST API (`/health`, `/ocr`, `/ocr/source`) and Web UI (`/`).
+  - `app/main.py`: REST API (`/health`, `/templates`, `/ocr`, `/ocr/source`) and Web UI (`/`).
 
 ## Usage
 
@@ -55,6 +55,18 @@ curl -X POST "http://HOME_ASSISTANT_HOST:8099/ocr" \
 ```
 
 Raw PDF content in the request body is also supported (`Content-Type: application/pdf`).
+
+Optional query params:
+
+- `template_id=<builtin_template_id>`
+- `template_json=<json_template_string>`
+- `auto_detect_template=true|false`
+
+Behavior:
+
+- If `template_id` or `template_json` is provided, the endpoint returns structured output using that template.
+- If no template is provided and `auto_detect_template=true` (default), the add-on compares the OCR result against the built-in templates and returns the best structured match when its average section-anchor score is high enough.
+- If no template is provided and `auto_detect_template=false`, the endpoint returns the raw OCR payload.
 
 Example response:
 
@@ -85,3 +97,97 @@ Allows processing a PDF from a remote or local source:
 - `source_type=url` and `source_value=https://.../file.pdf`
 - `source_type=local_path` and `source_value=/config/file.pdf`
 - `source_type=local_path` and `source_value=/homeassistant/file.pdf` (alias to `/config/file.pdf`)
+
+Optional form fields:
+
+- `template_id`
+- `template_json`
+- `auto_detect_template`
+
+The same template-selection behavior used by `/ocr` also applies here: explicit template first, then auto-detection by default, or raw OCR when disabled.
+
+### `GET /templates`
+
+Lists built-in template IDs available for `template_id`.
+
+## Web UI template selection
+
+The Web UI now lets you choose between:
+
+- `Auto-detect`: compares the OCR JSON against the built-in templates and returns the best structured match
+- `None (raw OCR)`: returns the raw OCR JSON without template formatting
+- A specific built-in template ID: forces that template for the response
+
+### Template shape (`template_json`)
+
+Templates now represent real PDF sections explicitly:
+
+- `sections[]`: each logical/visual section in the PDF.
+- `sections[].lines[]`: logical lines inside the section.
+- `sections[].lines[].boxes[]`: text boxes with semantic `role`.
+
+Supported `role` values:
+
+- `fixed`: canonical label text (supports fuzzy matching and overwrite of OCR text).
+- `variable`: value that changes from PDF to PDF and is associated using `locator.strategy`.
+- `mixed`: one line containing fixed + variable text using `?` placeholders in template text.
+- `ignore`: currently ignored in output.
+
+### Shorthand template (section/line/type)
+
+The API also accepts a shorthand schema where each line uses a simple `type`:
+
+- `fixed`: static text anchor
+- `mixed`: static + variable in one line, where `?` marks the variable segment(s)
+- `ignore`: line intentionally skipped from extraction
+
+Use `ignore` for non-business lines (for example tracking/reference numbers) that may appear in the section but should not be captured as a field.
+
+Example:
+
+```json
+{
+  "section": {
+    "id": "encabezado_pago",
+    "name": "Encabezado",
+    "lines": [
+      { "text": "¡Paga tu Gasto Común en línea!", "type": "fixed" },
+      { "text": "Ingresa a: https://pagos.kastor.cl", "type": "fixed" },
+      { "text": "Código cliente: ??????-?????", "type": "mixed", "key": "codigo_cliente" },
+      { "text": "44121821052026", "type": "ignore" }
+    ]
+  }
+}
+```
+
+This shorthand is internally converted to the canonical `sections -> lines -> boxes` structure.
+
+Minimal example:
+
+```json
+{
+  "template_id": "gasto_comun_v1",
+  "document_type": "gasto_comun",
+  "matching": {
+    "normalize_accents": true,
+    "ignore_case": true,
+    "collapse_whitespace": true,
+    "default_fuzzy_threshold": 0.82
+  },
+  "sections": [
+    {
+      "id": "datos_comunidad",
+      "anchors": ["Comunidad", "Dirección", "Fecha de último pago"],
+      "lines": [
+        {
+          "id": "linea_comunidad",
+          "boxes": [
+            { "role": "fixed", "key": "comunidad_label", "canonical_text": "Comunidad", "overwrite_ocr_text": true },
+            { "role": "variable", "key": "comunidad", "locator": { "strategy": "nearest_right_or_below", "max_distance": 2 } }
+          ]
+        }
+      ]
+    }
+  ]
+}
+```

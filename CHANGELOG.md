@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.0
+- Added template-driven structured output on top of OCR results using `section -> lines -> boxes` JSON templates.
+- Added fuzzy matching for fixed fields so OCR text can be elastically matched and overwritten with canonical template text (for example accent/sign OCR errors).
+- Added variable field extraction by locator strategies (for example `nearest_right_or_below`) to pair fixed labels with changing values.
+- Added optional template parameters (`template_id`, `template_json`) to `POST /ocr` and `POST /ocr/source`.
+- Added `GET /templates` to discover built-in template IDs.
+
 ## 0.2.9
 - Added "Upload file" option to the Web UI, allowing users to upload a PDF directly from their device for analysis, in addition to the existing URL and local-path options.
 - The file-upload option shows a dedicated file picker (hidden when URL or local-path is selected) and posts directly to the existing `POST /ocr` endpoint.
