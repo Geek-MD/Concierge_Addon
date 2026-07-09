@@ -58,6 +58,14 @@ WEB_UI_HTML = """<!doctype html>
         <option value="file_upload">Upload file</option>
       </select>
     </div>
+    <div class="row">
+      <label for="templateId">Template</label>
+      <select id="templateId" name="templateId">
+        <option value="__auto__">Auto-detect</option>
+        <option value="__none__">None (raw OCR)</option>
+      </select>
+      <span class="hint">Choose a built-in template, auto-detect the best match, or return raw OCR.</span>
+    </div>
     <div class="row" id="sourceValueRow">
       <label for="sourceValue">PDF URL or path</label>
       <input id="sourceValue" name="sourceValue" placeholder="https://.../file.pdf or /config/file.pdf (/homeassistant/... also supported)" required />
@@ -80,6 +88,7 @@ WEB_UI_HTML = """<!doctype html>
   <script>
     const form = document.getElementById('ocrForm');
     const sourceType = document.getElementById('sourceType');
+    const templateId = document.getElementById('templateId');
     const sourceValue = document.getElementById('sourceValue');
     const fileInput = document.getElementById('fileInput');
     const sourceValueRow = document.getElementById('sourceValueRow');
@@ -87,6 +96,25 @@ WEB_UI_HTML = """<!doctype html>
     const result = document.getElementById('result');
     const downloadBtn = document.getElementById('downloadBtn');
     let latestJson = null;
+
+    async function loadTemplates() {
+      const basePath = window.location.pathname.replace(/\/+$/, '');
+      const endpoint = new URL(`${basePath}/templates`, window.location.origin);
+      const response = await fetch(endpoint);
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.detail || 'Could not load templates');
+      }
+
+      for (const template of data.templates || []) {
+        const option = document.createElement('option');
+        option.value = template.template_id;
+        option.textContent = template.document_type
+          ? `${template.template_id} (${template.document_type})`
+          : template.template_id;
+        templateId.appendChild(option);
+      }
+    }
 
     sourceType.addEventListener('change', () => {
       const isUpload = sourceType.value === 'file_upload';
@@ -107,6 +135,7 @@ WEB_UI_HTML = """<!doctype html>
       try {
         const basePath = window.location.pathname.replace(/\/+$/, '');
         let endpoint;
+        const selectedTemplate = templateId.value;
         if (sourceType.value === 'file_upload') {
           const file = fileInput.files[0];
           if (!file) {
@@ -117,10 +146,20 @@ WEB_UI_HTML = """<!doctype html>
           }
           payload.append('file', file, file.name);
           endpoint = new URL(`${basePath}/ocr`, window.location.origin);
+          if (selectedTemplate === '__none__') {
+            endpoint.searchParams.set('auto_detect_template', 'false');
+          } else if (selectedTemplate !== '__auto__') {
+            endpoint.searchParams.set('template_id', selectedTemplate);
+          }
         } else {
           payload.append('source_type', sourceType.value);
           payload.append('source_value', sourceValue.value.trim());
           endpoint = new URL(`${basePath}/ocr/source`, window.location.origin);
+          if (selectedTemplate === '__none__') {
+            payload.append('auto_detect_template', 'false');
+          } else if (selectedTemplate !== '__auto__') {
+            payload.append('template_id', selectedTemplate);
+          }
         }
 
         const response = await fetch(endpoint, { method: 'POST', body: payload });
@@ -144,6 +183,10 @@ WEB_UI_HTML = """<!doctype html>
       link.download = 'ocr_result.json';
       link.click();
       URL.revokeObjectURL(link.href);
+    });
+
+    loadTemplates().catch((error) => {
+      result.value = `Error: ${error.message}`;
     });
   </script>
 </body>
@@ -571,6 +614,44 @@ def _apply_template(ocr_payload: dict[str, Any], template: dict[str, Any]) -> di
     return response
 
 
+def _detect_best_template(
+    raw_payload: dict[str, Any], builtin_templates: dict[str, dict[str, Any]], min_score: float = 0.5
+) -> dict[str, Any] | None:
+    """Return the best built-in template match for an OCR payload using average section anchor scores."""
+    best_template: dict[str, Any] | None = None
+    best_score = 0.0
+
+    for template in builtin_templates.values():
+        matching_cfg = template.get("matching", {})
+        flattened_lines = _flatten_ocr_lines(raw_payload, matching_cfg)
+        sections = template.get("sections", [])
+        if not sections:
+            continue
+
+        section_scores = [
+            _section_anchor_score(section, flattened_lines, matching_cfg)[0]
+            for section in sections
+            if isinstance(section, dict)
+        ]
+        if not section_scores:
+            continue
+
+        template_score = sum(section_scores) / len(section_scores)
+        if template_score > best_score:
+            best_score = template_score
+            best_template = template
+
+    if best_template is not None and best_score >= min_score:
+        logger.info(
+            "Auto-detected template_id '%s' with score %.4f",
+            best_template.get("template_id"),
+            best_score,
+        )
+        return best_template
+
+    return None
+
+
 def _slugify_key(value: str, default_key: str) -> str:
     """Convert text into a safe key using lowercase alnum and underscores, with fallback."""
     normalized = _remove_accents(value).lower()
@@ -796,7 +877,9 @@ def _load_local_pdf(local_path: str) -> bytes:
         raise HTTPException(status_code=400, detail=f"Could not read the local PDF: {exc}") from exc
 
 
-def _process_pdf_bytes(pdf_bytes: bytes, template: dict[str, Any] | None = None) -> dict[str, Any]:
+def _process_pdf_bytes(
+    pdf_bytes: bytes, template: dict[str, Any] | None = None, auto_detect: bool = True
+) -> dict[str, Any]:
     if not pdf_bytes:
         raise HTTPException(status_code=400, detail="No PDF was received")
 
@@ -830,10 +913,18 @@ def _process_pdf_bytes(pdf_bytes: bytes, template: dict[str, Any] | None = None)
         "text": "\n\n".join(page["text"] for page in pages if page["text"]),
     }
 
+    auto_detected = False
+    if template is None and auto_detect:
+        template = _detect_best_template(raw_payload, BUILTIN_TEMPLATES)
+        auto_detected = template is not None
+
     if template is None:
         return raw_payload
 
-    return _apply_template(raw_payload, template)
+    structured_payload = _apply_template(raw_payload, template)
+    if auto_detected:
+        structured_payload["auto_detected"] = True
+    return structured_payload
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -866,6 +957,7 @@ async def handle_ocr_request(
     file: UploadFile | None = File(default=None),
     template_id: str | None = None,
     template_json: str | None = None,
+    auto_detect_template: bool = True,
 ) -> dict[str, Any]:
     try:
         template = _resolve_template(template_id=template_id, template_json=template_json)
@@ -876,7 +968,7 @@ async def handle_ocr_request(
         else:
             pdf_bytes = await request.body()
 
-        return _process_pdf_bytes(pdf_bytes, template=template)
+        return _process_pdf_bytes(pdf_bytes, template=template, auto_detect=auto_detect_template)
     except HTTPException as exc:
         logger.warning("Request to /ocr failed: %s", exc.detail)
         raise
@@ -891,6 +983,7 @@ async def handle_ocr_source_request(
     source_value: str = Form(...),
     template_id: str | None = Form(default=None),
     template_json: str | None = Form(default=None),
+    auto_detect_template: bool = Form(default=True),
 ) -> dict[str, Any]:
     normalized_source = source_type.strip().lower()
     normalized_value = source_value.strip()
@@ -907,7 +1000,7 @@ async def handle_ocr_source_request(
         else:
             raise HTTPException(status_code=400, detail="source_type must be 'url' or 'local_path'")
 
-        return _process_pdf_bytes(pdf_bytes, template=template)
+        return _process_pdf_bytes(pdf_bytes, template=template, auto_detect=auto_detect_template)
     except HTTPException as exc:
         logger.warning("Request to /ocr/source failed: %s (source_type=%s)", exc.detail, normalized_source)
         raise

@@ -60,8 +60,13 @@ Optional query params:
 
 - `template_id=<builtin_template_id>`
 - `template_json=<json_template_string>`
+- `auto_detect_template=true|false`
 
-When one of these template parameters is provided, the endpoint returns a structured JSON output (section-based) instead of the raw OCR payload.
+Behavior:
+
+- If `template_id` or `template_json` is provided, the endpoint returns structured output using that template.
+- If no template is provided and `auto_detect_template=true` (default), the add-on compares the OCR result against the built-in templates and returns the best structured match when its average section-anchor score is high enough.
+- If no template is provided and `auto_detect_template=false`, the endpoint returns the raw OCR payload.
 
 Example response:
 
@@ -97,12 +102,21 @@ Optional form fields:
 
 - `template_id`
 - `template_json`
+- `auto_detect_template`
 
-If provided, the OCR result is transformed into a template-structured output.
+The same template-selection behavior used by `/ocr` also applies here: explicit template first, then auto-detection by default, or raw OCR when disabled.
 
 ### `GET /templates`
 
 Lists built-in template IDs available for `template_id`.
+
+## Web UI template selection
+
+The Web UI now lets you choose between:
+
+- `Auto-detect`: compares the OCR JSON against the built-in templates and returns the best structured match
+- `None (raw OCR)`: returns the raw OCR JSON without template formatting
+- A specific built-in template ID: forces that template for the response
 
 ### Template shape (`template_json`)
 
