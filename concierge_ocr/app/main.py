@@ -564,6 +564,21 @@ def _apply_template(ocr_payload: dict[str, Any], template: dict[str, Any]) -> di
                         fields[key] = fixed_match["text"] if fixed_match else None
                         continue
 
+                    if role == "ignore":
+                        canonical_text = str(box.get("canonical_text") or box.get("text") or "").strip()
+                        if canonical_text:
+                            threshold = float(box.get("fuzzy_threshold", default_threshold))
+                            match = _find_best_fixed_match(
+                                canonical_text,
+                                flattened_lines,
+                                matching_cfg,
+                                threshold=threshold,
+                                page_hint=section_page_hint,
+                            )
+                            if match is not None:
+                                match["line"]["used_variable"] = True
+                        continue
+
                     if role != "variable" or not key:
                         if role != "mixed" or not key:
                             continue
@@ -697,7 +712,7 @@ def _coerce_template_schema(template: dict[str, Any]) -> dict[str, Any]:
                 coerced_lines.append(
                     {
                         "id": f"line_{line_index}",
-                        "boxes": [{"role": "ignore", "key": key or f"ignore_{line_index}"}],
+                        "boxes": [{"role": "ignore", "key": key or f"ignore_{line_index}", "canonical_text": text}],
                     }
                 )
                 continue

@@ -127,6 +127,8 @@ The API also accepts a shorthand schema where each line uses a simple `type`:
 - `mixed`: static + variable in one line, where `?` marks the variable segment(s)
 - `ignore`: line intentionally skipped from extraction
 
+Use `ignore` for non-business lines (for example tracking/reference numbers) that may appear in the section but should not be captured as a field.
+
 Example:
 
 ```json
