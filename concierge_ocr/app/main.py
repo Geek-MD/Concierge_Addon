@@ -313,21 +313,41 @@ DEFAULT_TEMPLATE: dict[str, Any] = {
                     ],
                 },
                 {
+                    "id": "linea_direccion",
+                    "boxes": [
+                        {
+                            "role": "mixed",
+                            "key": "direccion",
+                            "text": "???? ??? - ????",
+                        }
+                    ],
+                },
+                {
+                    "id": "linea_ciudad",
+                    "boxes": [
+                        {
+                            "role": "mixed",
+                            "key": "ciudad",
+                            "text": "????",
+                        }
+                    ],
+                },
+                {
                     "id": "linea_fono",
                     "boxes": [
                         {
                             "role": "mixed",
                             "key": "fono",
-                            "text": "Fono: ?????????",
+                            "text": "Fono: +?????????",
                         }
                     ],
                 },
                 {
-                    "id": "linea_administracion",
+                    "id": "linea_codigo_opcional",
                     "boxes": [
                         {
                             "role": "ignore",
-                            "canonical_text": "Administración",
+                            "canonical_text": "??????????????",
                             "required": False,
                         }
                     ],
