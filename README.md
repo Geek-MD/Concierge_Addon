@@ -116,7 +116,33 @@ Supported `role` values:
 
 - `fixed`: canonical label text (supports fuzzy matching and overwrite of OCR text).
 - `variable`: value that changes from PDF to PDF and is associated using `locator.strategy`.
+- `mixed`: one line containing fixed + variable text using `?` placeholders in template text.
 - `ignore`: currently ignored in output.
+
+### Shorthand template (section/line/type)
+
+The API also accepts a shorthand schema where each line uses a simple `type`:
+
+- `fixed`: static text anchor
+- `mixed`: static + variable in one line, where `?` marks the variable segment(s)
+
+Example:
+
+```json
+{
+  "section": {
+    "id": "encabezado_pago",
+    "name": "Encabezado",
+    "lines": [
+      { "text": "¡Paga tu Gasto Común en línea!", "type": "fixed" },
+      { "text": "Ingresa a: https://pagos.kastor.cl", "type": "fixed" },
+      { "text": "Código cliente: ??????-?????", "type": "mixed", "key": "codigo_cliente" }
+    ]
+  }
+}
+```
+
+This shorthand is internally converted to the canonical `sections -> lines -> boxes` structure.
 
 Minimal example:
 

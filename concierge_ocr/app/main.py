@@ -2,6 +2,7 @@ import ipaddress
 import json
 import logging
 import os
+import re
 import socket
 import unicodedata
 from difflib import SequenceMatcher
@@ -274,6 +275,7 @@ def _extract_page_lines(ocr_result: Any) -> list[dict[str, Any]]:
 
 
 def _normalize_text(text: str, matching_cfg: dict[str, Any]) -> str:
+    """Normalize OCR/template text according to matching settings before fuzzy comparison."""
     normalized = text
     if matching_cfg.get("normalize_accents", True):
         normalized = _remove_accents(normalized)
@@ -285,6 +287,7 @@ def _normalize_text(text: str, matching_cfg: dict[str, Any]) -> str:
 
 
 def _similarity(left: str, right: str) -> float:
+    """Return string similarity ratio in the [0.0, 1.0] range using SequenceMatcher."""
     if not left and not right:
         return 1.0
     if not left or not right:
@@ -349,6 +352,7 @@ def _find_best_fixed_match(
     threshold: float,
     page_hint: int | None = None,
 ) -> dict[str, Any] | None:
+    """Find the best OCR line for a fixed canonical label above a similarity threshold."""
     normalized_canonical = _normalize_text(canonical_text, matching_cfg)
     best_line: dict[str, Any] | None = None
     best_score = 0.0
@@ -364,7 +368,10 @@ def _find_best_fixed_match(
     return {"line": best_line, "score": best_score}
 
 
-def _candidate_cost(anchor_line: dict[str, Any], candidate_line: dict[str, Any], strategy: str, max_distance: int) -> tuple[int, float] | None:
+def _calculate_candidate_priority(
+    anchor_line: dict[str, Any], candidate_line: dict[str, Any], strategy: str, max_distance: int
+) -> tuple[int, float] | None:
+    """Return candidate priority tuple for variable extraction or None if candidate is invalid."""
     if anchor_line["page"] != candidate_line["page"]:
         return None
 
@@ -405,6 +412,7 @@ def _find_variable_value(
     locator: dict[str, Any],
     section_page_hint: int | None,
 ) -> dict[str, Any] | None:
+    """Find a variable-value OCR line using the configured locator strategy and optional anchor line."""
     strategy = str(locator.get("strategy", "nearest_right_or_below"))
     max_distance = int(locator.get("max_distance", 2))
 
@@ -424,7 +432,7 @@ def _find_variable_value(
             continue
         if line is anchor_line:
             continue
-        cost = _candidate_cost(anchor_line, line, strategy, max_distance)
+        cost = _calculate_candidate_priority(anchor_line, line, strategy, max_distance)
         if cost is None:
             continue
         candidates.append((cost, line))
@@ -436,7 +444,50 @@ def _find_variable_value(
     return candidates[0][1]
 
 
+def _find_mixed_value(
+    mixed_text: str,
+    flattened_lines: list[dict[str, Any]],
+    matching_cfg: dict[str, Any],
+    page_hint: int | None,
+) -> tuple[str | None, dict[str, Any] | None]:
+    """Extract mixed-line variable value using '?' placeholders in the template text."""
+    normalized_template = _normalize_text(mixed_text, matching_cfg)
+    escaped_template = re.escape(normalized_template)
+    mixed_pattern = re.sub(r"(\\\?)+", "(.+?)", escaped_template)
+    matcher = re.compile(f"^{mixed_pattern}$")
+
+    best_line: dict[str, Any] | None = None
+    best_re_match: re.Match[str] | None = None
+    best_score = -1.0
+    for line in flattened_lines:
+        if line["used_variable"] or not line["text"]:
+            continue
+        if page_hint is not None and line["page"] != page_hint:
+            continue
+        match = matcher.match(line["normalized_text"])
+        if match is None:
+            continue
+        candidate_score = _similarity(normalized_template.replace("?", ""), line["normalized_text"])
+        if candidate_score > best_score:
+            best_score = candidate_score
+            best_line = line
+            best_re_match = match
+
+    if best_line is None or best_re_match is None:
+        return None, None
+
+    if best_re_match.lastindex and best_re_match.lastindex > 0:
+        start_index = best_re_match.start(1)
+        end_index = best_re_match.end(best_re_match.lastindex)
+        extracted = best_line["normalized_text"][start_index:end_index].strip()
+    else:
+        extracted = best_line["normalized_text"].strip()
+
+    return extracted or None, best_line
+
+
 def _section_anchor_score(section: dict[str, Any], flattened_lines: list[dict[str, Any]], matching_cfg: dict[str, Any]) -> tuple[float, int | None]:
+    """Return section anchor average score and the most frequent matched page as hint."""
     anchors = section.get("anchors") or section.get("match", {}).get("anchors") or []
     if not anchors:
         return 1.0, None
@@ -462,6 +513,7 @@ def _section_anchor_score(section: dict[str, Any], flattened_lines: list[dict[st
 
 
 def _apply_template(ocr_payload: dict[str, Any], template: dict[str, Any]) -> dict[str, Any]:
+    """Transform raw OCR payload into section-based structured output using a template."""
     matching_cfg = template.get("matching", {})
     output_cfg = template.get("output", {})
     default_threshold = float(matching_cfg.get("default_fuzzy_threshold", 0.82))
@@ -509,6 +561,22 @@ def _apply_template(ocr_payload: dict[str, Any], template: dict[str, Any]) -> di
                         continue
 
                     if role != "variable" or not key:
+                        if role != "mixed" or not key:
+                            continue
+                        mixed_value, mixed_line = _find_mixed_value(
+                            mixed_text=str(box.get("text", "")),
+                            flattened_lines=flattened_lines,
+                            matching_cfg=matching_cfg,
+                            page_hint=section_page_hint,
+                        )
+                        if mixed_line is not None:
+                            mixed_line["used_variable"] = True
+                        fields[key] = mixed_value
+                        line_results[key] = {
+                            "value": fields[key],
+                            "page": mixed_line["page"] if mixed_line else None,
+                            "line_index": mixed_line["line_index"] if mixed_line else None,
+                        }
                         continue
 
                     locator_value = box.get("locator")
@@ -558,13 +626,101 @@ def _apply_template(ocr_payload: dict[str, Any], template: dict[str, Any]) -> di
     return response
 
 
+def _slugify_key(value: str, default_key: str) -> str:
+    normalized = _remove_accents(value).lower()
+    normalized = re.sub(r"[^a-z0-9]+", "_", normalized).strip("_")
+    return normalized or default_key
+
+
+def _coerce_template_schema(template: dict[str, Any]) -> dict[str, Any]:
+    """Coerce shorthand template schemas into the canonical sections/lines/boxes schema."""
+    if "sections" in template:
+        return template
+    if "section" not in template:
+        return template
+
+    section_source = template.get("section")
+    section_items = section_source if isinstance(section_source, list) else [section_source]
+    coerced_sections: list[dict[str, Any]] = []
+
+    for section_index, section_item in enumerate(section_items, start=1):
+        if not isinstance(section_item, dict):
+            continue
+        lines_source = section_item.get("lines", section_item.get("line", []))
+        if isinstance(lines_source, dict):
+            lines_source = [lines_source]
+        if not isinstance(lines_source, list):
+            lines_source = []
+
+        coerced_lines: list[dict[str, Any]] = []
+        anchors: list[str] = []
+
+        for line_index, line_item in enumerate(lines_source, start=1):
+            if not isinstance(line_item, dict):
+                continue
+            if "boxes" in line_item and isinstance(line_item.get("boxes"), list):
+                coerced_lines.append(line_item)
+                continue
+
+            text = str(line_item.get("text", "")).strip()
+            role_type = str(line_item.get("type", "fixed")).strip().lower()
+            key = str(line_item.get("key", "")).strip()
+
+            if role_type == "fixed":
+                anchors.append(text)
+                coerced_lines.append(
+                    {
+                        "id": f"line_{line_index}",
+                        "boxes": [{"role": "fixed", "key": key or f"fixed_{line_index}", "canonical_text": text, "overwrite_ocr_text": True}],
+                    }
+                )
+                continue
+
+            if role_type == "mixed":
+                static_label = text.split("?")[0].strip(" :.-")
+                mixed_key = key or _slugify_key(static_label or f"mixed_{line_index}", f"mixed_{line_index}")
+                anchors.append(static_label or text)
+                coerced_lines.append(
+                    {
+                        "id": f"line_{line_index}",
+                        "boxes": [{"role": "mixed", "key": mixed_key, "text": text}],
+                    }
+                )
+                continue
+
+            variable_key = key or _slugify_key(text, f"variable_{line_index}")
+            coerced_lines.append(
+                {
+                    "id": f"line_{line_index}",
+                    "boxes": [{"role": "variable", "key": variable_key, "locator": {"strategy": "nearest_right_or_below", "max_distance": 2}}],
+                }
+            )
+
+        coerced_sections.append(
+            {
+                "id": str(section_item.get("id", f"section_{section_index}")),
+                "name": section_item.get("name", f"section_{section_index}"),
+                "anchors": section_item.get("anchors", anchors),
+                "min_score": section_item.get("min_score", template.get("matching", {}).get("default_fuzzy_threshold", 0.82)),
+                "lines": coerced_lines,
+            }
+        )
+
+    coerced_template = dict(template)
+    coerced_template.pop("section", None)
+    coerced_template["sections"] = coerced_sections
+    return coerced_template
+
+
 def _validate_template(template: dict[str, Any]) -> dict[str, Any]:
+    """Validate minimum template contract: object with a non-empty sections array."""
     if not isinstance(template, dict):
         raise HTTPException(status_code=400, detail="Invalid template: expected an object")
-    sections = template.get("sections")
+    coerced_template = _coerce_template_schema(template)
+    sections = coerced_template.get("sections")
     if not isinstance(sections, list) or not sections:
         raise HTTPException(status_code=400, detail="Invalid template: 'sections' must be a non-empty array")
-    return template
+    return coerced_template
 
 
 def _resolve_template(template_id: str | None, template_json: str | None) -> dict[str, Any] | None:
