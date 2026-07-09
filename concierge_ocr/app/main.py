@@ -296,16 +296,19 @@ def _similarity(left: str, right: str) -> float:
 
 
 def _remove_accents(text: str) -> str:
+    """Remove accents/diacritics by filtering Unicode combining marks."""
     return "".join(char for char in unicodedata.normalize("NFKD", text) if not unicodedata.combining(char))
 
 
 def _most_frequent_page(pages: list[int]) -> int | None:
+    """Return the most frequent page number from a list, or None if empty."""
     if not pages:
         return None
     return max(set(pages), key=pages.count)
 
 
 def _box_center(box: Any) -> tuple[float | None, float | None]:
+    """Return center (x, y) for a quadrilateral-like OCR box, or (None, None) if invalid."""
     if not isinstance(box, list) or not box:
         return None, None
     coordinates: list[tuple[float, float]] = []
@@ -323,6 +326,7 @@ def _box_center(box: Any) -> tuple[float | None, float | None]:
 
 
 def _flatten_ocr_lines(ocr_payload: dict[str, Any], matching_cfg: dict[str, Any]) -> list[dict[str, Any]]:
+    """Flatten OCR pages/lines into searchable line records with normalized text and coordinates."""
     flattened: list[dict[str, Any]] = []
     for page in ocr_payload.get("pages", []):
         page_number = int(page.get("page", 0))
@@ -627,6 +631,7 @@ def _apply_template(ocr_payload: dict[str, Any], template: dict[str, Any]) -> di
 
 
 def _slugify_key(value: str, default_key: str) -> str:
+    """Convert text into a safe key using lowercase alnum and underscores, with fallback."""
     normalized = _remove_accents(value).lower()
     normalized = re.sub(r"[^a-z0-9]+", "_", normalized).strip("_")
     return normalized or default_key
