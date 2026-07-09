@@ -1,0 +1,30 @@
+name: Code Quality
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  static-checks:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install tooling
+        run: python -m pip install --upgrade pip ruff==0.15.21 mypy==2.2.0
+
+      - name: Run Ruff
+        run: ruff check concierge_ocr/app
+
+      - name: Run mypy
+        run: mypy --ignore-missing-imports concierge_ocr/app
