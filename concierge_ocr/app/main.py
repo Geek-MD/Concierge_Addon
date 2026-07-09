@@ -242,7 +242,165 @@ DEFAULT_TEMPLATE: dict[str, Any] = {
                     ],
                 },
             ],
-        }
+        },
+        {
+            "id": "tabla_nota_cobro",
+            "name": "Tabla nota de cobro",
+            "anchors": [
+                "Nota de Cobro Mes",
+                "Copropietario",
+                "Fecha último Pago",
+                "Alícuota Total",
+                "Monto último Pago",
+                "Gasto común a Prorratear",
+                "Folio último Pago",
+            ],
+            "min_score": 0.78,
+            "lines": [
+                {
+                    "id": "linea_nota_cobro_mes_depto",
+                    "boxes": [
+                        {
+                            "role": "mixed",
+                            "key": "nota_cobro_mes_depto",
+                            "text": "Nota de Cobro Mes ???? Depto. ???",
+                        }
+                    ],
+                },
+                {
+                    "id": "linea_copropietario",
+                    "boxes": [
+                        {
+                            "role": "fixed",
+                            "key": "copropietario_label",
+                            "canonical_text": "Copropietario",
+                            "required": True,
+                            "overwrite_ocr_text": True,
+                        },
+                        {
+                            "role": "variable",
+                            "key": "copropietario",
+                            "value_type": "string",
+                            "required": False,
+                            "locator": {
+                                "strategy": "nearest_right_or_below",
+                                "max_distance": 2,
+                            },
+                        },
+                    ],
+                },
+                {
+                    "id": "linea_fecha_ultimo_pago_tabla",
+                    "boxes": [
+                        {
+                            "role": "fixed",
+                            "key": "fecha_ultimo_pago_tabla_label",
+                            "canonical_text": "Fecha último Pago",
+                            "required": True,
+                            "overwrite_ocr_text": True,
+                        },
+                        {
+                            "role": "variable",
+                            "key": "fecha_ultimo_pago_tabla",
+                            "value_type": "date",
+                            "required": False,
+                            "locator": {
+                                "strategy": "nearest_right_or_below",
+                                "max_distance": 2,
+                            },
+                        },
+                    ],
+                },
+                {
+                    "id": "linea_alicuota_total",
+                    "boxes": [
+                        {
+                            "role": "fixed",
+                            "key": "alicuota_total_label",
+                            "canonical_text": "Alícuota Total",
+                            "required": True,
+                            "overwrite_ocr_text": True,
+                        },
+                        {
+                            "role": "variable",
+                            "key": "alicuota_total",
+                            "value_type": "string",
+                            "required": False,
+                            "locator": {
+                                "strategy": "nearest_right_or_below",
+                                "max_distance": 2,
+                            },
+                        },
+                    ],
+                },
+                {
+                    "id": "linea_monto_ultimo_pago",
+                    "boxes": [
+                        {
+                            "role": "fixed",
+                            "key": "monto_ultimo_pago_label",
+                            "canonical_text": "Monto último Pago",
+                            "required": True,
+                            "overwrite_ocr_text": True,
+                        },
+                        {
+                            "role": "variable",
+                            "key": "monto_ultimo_pago",
+                            "value_type": "string",
+                            "required": False,
+                            "locator": {
+                                "strategy": "nearest_right_or_below",
+                                "max_distance": 2,
+                            },
+                        },
+                    ],
+                },
+                {
+                    "id": "linea_gasto_comun_prorratear",
+                    "boxes": [
+                        {
+                            "role": "fixed",
+                            "key": "gasto_comun_a_prorratear_label",
+                            "canonical_text": "Gasto común a Prorratear",
+                            "required": True,
+                            "overwrite_ocr_text": True,
+                        },
+                        {
+                            "role": "variable",
+                            "key": "gasto_comun_a_prorratear",
+                            "value_type": "string",
+                            "required": False,
+                            "locator": {
+                                "strategy": "nearest_right_or_below",
+                                "max_distance": 2,
+                            },
+                        },
+                    ],
+                },
+                {
+                    "id": "linea_folio_ultimo_pago",
+                    "boxes": [
+                        {
+                            "role": "fixed",
+                            "key": "folio_ultimo_pago_label",
+                            "canonical_text": "Folio último Pago",
+                            "required": True,
+                            "overwrite_ocr_text": True,
+                        },
+                        {
+                            "role": "variable",
+                            "key": "folio_ultimo_pago",
+                            "value_type": "string",
+                            "required": False,
+                            "locator": {
+                                "strategy": "nearest_right_or_below",
+                                "max_distance": 2,
+                            },
+                        },
+                    ],
+                },
+            ],
+        },
     ],
 }
 BUILTIN_TEMPLATES: dict[str, dict[str, Any]] = {DEFAULT_TEMPLATE["template_id"]: DEFAULT_TEMPLATE}
