@@ -276,7 +276,7 @@ def _extract_page_lines(ocr_result: Any) -> list[dict[str, Any]]:
 def _normalize_text(text: str, matching_cfg: dict[str, Any]) -> str:
     normalized = text
     if matching_cfg.get("normalize_accents", True):
-        normalized = "".join(char for char in unicodedata.normalize("NFKD", normalized) if not unicodedata.combining(char))
+        normalized = _remove_accents(normalized)
     if matching_cfg.get("ignore_case", True):
         normalized = normalized.lower()
     if matching_cfg.get("collapse_whitespace", True):
@@ -285,9 +285,21 @@ def _normalize_text(text: str, matching_cfg: dict[str, Any]) -> str:
 
 
 def _similarity(left: str, right: str) -> float:
+    if not left and not right:
+        return 1.0
     if not left or not right:
         return 0.0
     return SequenceMatcher(None, left, right).ratio()
+
+
+def _remove_accents(text: str) -> str:
+    return "".join(char for char in unicodedata.normalize("NFKD", text) if not unicodedata.combining(char))
+
+
+def _most_frequent_page(pages: list[int]) -> int | None:
+    if not pages:
+        return None
+    return max(set(pages), key=pages.count)
 
 
 def _box_center(box: Any) -> tuple[float | None, float | None]:
@@ -410,7 +422,7 @@ def _find_variable_value(
             continue
         if line["page"] != anchor_line["page"]:
             continue
-        if line["line_index"] == anchor_line["line_index"] and line["text"] == anchor_line["text"]:
+        if line is anchor_line:
             continue
         cost = _candidate_cost(anchor_line, line, strategy, max_distance)
         if cost is None:
@@ -445,7 +457,7 @@ def _section_anchor_score(section: dict[str, Any], flattened_lines: list[dict[st
         return 0.0, None
 
     section_score = sum(scores) / len(scores)
-    page_hint = max(set(pages), key=pages.count) if pages else None
+    page_hint = _most_frequent_page(pages)
     return section_score, page_hint
 
 
@@ -469,10 +481,9 @@ def _apply_template(ocr_payload: dict[str, Any], template: dict[str, Any]) -> di
 
         if is_section_match:
             for line_template in section.get("lines", []):
-                line_id = str(line_template.get("id", "line"))
-                fixed_matches: list[dict[str, Any]] = []
+                fixed_matches: dict[int, dict[str, Any]] = {}
 
-                for box in line_template.get("boxes", []):
+                for box_index, box in enumerate(line_template.get("boxes", [])):
                     if str(box.get("role", "")).lower() != "fixed":
                         continue
                     canonical_text = str(box.get("canonical_text") or box.get("text") or "").strip()
@@ -482,28 +493,28 @@ def _apply_template(ocr_payload: dict[str, Any], template: dict[str, Any]) -> di
                     match = _find_best_fixed_match(canonical_text, flattened_lines, matching_cfg, threshold=threshold, page_hint=section_page_hint)
                     if match is None:
                         continue
-                    fixed_matches.append(
-                        {
+                    fixed_matches[box_index] = {
                             "box": box,
                             "line": match["line"],
                             "score": match["score"],
                             "text": canonical_text if box.get("overwrite_ocr_text", True) else match["line"]["text"],
                         }
-                    )
 
-                for box in line_template.get("boxes", []):
+                for box_index, box in enumerate(line_template.get("boxes", [])):
                     role = str(box.get("role", "")).lower()
                     key = str(box.get("key", "")).strip()
                     if role == "fixed" and key and box.get("include_in_output", False):
-                        fixed_match = next((entry for entry in fixed_matches if entry["box"] is box), None)
+                        fixed_match = fixed_matches.get(box_index)
                         fields[key] = fixed_match["text"] if fixed_match else None
                         continue
 
                     if role != "variable" or not key:
                         continue
 
-                    locator = box.get("locator", {}) if isinstance(box.get("locator"), dict) else {}
-                    anchor_line = fixed_matches[0]["line"] if fixed_matches else None
+                    locator_value = box.get("locator")
+                    locator = locator_value if isinstance(locator_value, dict) else {}
+                    first_fixed_match = next(iter(fixed_matches.values()), None)
+                    anchor_line = first_fixed_match["line"] if first_fixed_match else None
                     variable_line = _find_variable_value(anchor_line, flattened_lines, locator, section_page_hint)
                     if variable_line is not None:
                         variable_line["used_variable"] = True
@@ -561,7 +572,7 @@ def _resolve_template(template_id: str | None, template_json: str | None) -> dic
         try:
             template = json.loads(template_json)
         except json.JSONDecodeError as exc:
-            raise HTTPException(status_code=400, detail=f"Invalid template JSON: {exc.msg}") from exc
+            raise HTTPException(status_code=400, detail=f"Invalid template JSON at position {exc.pos}: {exc.msg}") from exc
         return _validate_template(template)
 
     if template_id:
