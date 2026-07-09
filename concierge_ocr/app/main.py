@@ -401,6 +401,98 @@ DEFAULT_TEMPLATE: dict[str, Any] = {
                 },
             ],
         },
+        {
+            "id": "tabla_consumos_generales",
+            "name": "Tabla Consumos Generales",
+            "anchors": [
+                "Consumos Generales",
+                "Lectura Anterior",
+                "Lectura Actual",
+                "Agua Caliente",
+                "Subtotal Consumo",
+            ],
+            "min_score": 0.78,
+            "lines": [
+                {
+                    "id": "linea_agua_caliente",
+                    "boxes": [
+                        {
+                            "role": "fixed",
+                            "key": "agua_caliente_label",
+                            "canonical_text": "Agua Caliente",
+                            "required": True,
+                            "overwrite_ocr_text": True,
+                        },
+                        {
+                            "role": "variable",
+                            "key": "agua_caliente_lectura_anterior",
+                            "value_type": "string",
+                            "required": False,
+                            "locator": {
+                                "strategy": "same_line_right",
+                            },
+                        },
+                        {
+                            "role": "variable",
+                            "key": "agua_caliente_lectura_actual",
+                            "value_type": "string",
+                            "required": False,
+                            "locator": {
+                                "strategy": "same_line_right",
+                            },
+                        },
+                        {
+                            "role": "variable",
+                            "key": "agua_caliente_consumos",
+                            "value_type": "string",
+                            "required": False,
+                            "locator": {
+                                "strategy": "same_line_right",
+                            },
+                        },
+                        {
+                            "role": "variable",
+                            "key": "agua_caliente_valor",
+                            "value_type": "string",
+                            "required": False,
+                            "locator": {
+                                "strategy": "same_line_right",
+                            },
+                        },
+                        {
+                            "role": "variable",
+                            "key": "agua_caliente_total",
+                            "value_type": "string",
+                            "required": False,
+                            "locator": {
+                                "strategy": "same_line_right",
+                            },
+                        },
+                    ],
+                },
+                {
+                    "id": "linea_subtotal_consumo",
+                    "boxes": [
+                        {
+                            "role": "fixed",
+                            "key": "subtotal_consumo_label",
+                            "canonical_text": "Subtotal Consumo",
+                            "required": True,
+                            "overwrite_ocr_text": True,
+                        },
+                        {
+                            "role": "variable",
+                            "key": "subtotal_consumo",
+                            "value_type": "string",
+                            "required": False,
+                            "locator": {
+                                "strategy": "same_line_right",
+                            },
+                        },
+                    ],
+                },
+            ],
+        },
     ],
 }
 BUILTIN_TEMPLATES: dict[str, dict[str, Any]] = {DEFAULT_TEMPLATE["template_id"]: DEFAULT_TEMPLATE}
