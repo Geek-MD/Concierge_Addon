@@ -493,6 +493,104 @@ DEFAULT_TEMPLATE: dict[str, Any] = {
                 },
             ],
         },
+        {
+            "id": "tabla_gastos_por_unidad",
+            "name": "Tabla Gastos por Unidad",
+            "anchors": [
+                "Gastos por Unidad",
+                "Monto",
+                "Cargo Fijo",
+                "Subtotal Recarga",
+                "Total del mes",
+            ],
+            "min_score": 0.78,
+            "lines": [
+                {
+                    "id": "linea_cargo_fijo",
+                    "boxes": [
+                        {
+                            "role": "fixed",
+                            "key": "cargo_fijo_label",
+                            "canonical_text": "Cargo Fijo",
+                            "required": True,
+                            "overwrite_ocr_text": True,
+                        },
+                        {
+                            "role": "variable",
+                            "key": "cargo_fijo",
+                            "value_type": "string",
+                            "required": False,
+                            "locator": {
+                                "strategy": "same_line_right",
+                            },
+                        },
+                    ],
+                },
+                {
+                    "id": "linea_subtotal_recarga",
+                    "boxes": [
+                        {
+                            "role": "fixed",
+                            "key": "subtotal_recarga_label",
+                            "canonical_text": "Subtotal Recarga",
+                            "required": True,
+                            "overwrite_ocr_text": True,
+                        },
+                        {
+                            "role": "variable",
+                            "key": "subtotal_recarga",
+                            "value_type": "string",
+                            "required": False,
+                            "locator": {
+                                "strategy": "same_line_right",
+                            },
+                        },
+                    ],
+                },
+                {
+                    "id": "linea_total_del_mes",
+                    "boxes": [
+                        {
+                            "role": "fixed",
+                            "key": "total_del_mes_label",
+                            "canonical_text": "Total del mes",
+                            "required": True,
+                            "overwrite_ocr_text": True,
+                        },
+                        {
+                            "role": "variable",
+                            "key": "total_del_mes",
+                            "value_type": "string",
+                            "required": False,
+                            "locator": {
+                                "strategy": "same_line_right",
+                            },
+                        },
+                    ],
+                },
+                {
+                    "id": "linea_total_a_pagar_obligaciones_economicas",
+                    "boxes": [
+                        {
+                            "role": "fixed",
+                            "key": "total_a_pagar_obligaciones_economicas_label",
+                            "canonical_text": "Total a pagar obligaciones económicas",
+                            "required": True,
+                            "overwrite_ocr_text": True,
+                        },
+                        {
+                            "role": "variable",
+                            "key": "total_a_pagar_obligaciones_economicas",
+                            "value_type": "string",
+                            "required": False,
+                            "locator": {
+                                "strategy": "same_line_right",
+                            },
+                        },
+                    ],
+                },
+            ],
+        },
     ],
 }
 BUILTIN_TEMPLATES: dict[str, dict[str, Any]] = {DEFAULT_TEMPLATE["template_id"]: DEFAULT_TEMPLATE}
