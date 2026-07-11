@@ -18,7 +18,9 @@ from fastapi.responses import HTMLResponse
 from pdf2image import convert_from_bytes
 from paddleocr import PaddleOCR
 
-app = FastAPI(title="Concierge OCR API", version="0.3.0")
+APP_VERSION = "0.3.1"
+
+app = FastAPI(title="Concierge OCR API", version=APP_VERSION)
 logger = logging.getLogger("concierge_ocr.api")
 
 _OCR_INSTANCE: PaddleOCR | None = None
@@ -936,6 +938,11 @@ def web_ui() -> HTMLResponse:
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/status")
+def status() -> dict[str, Any]:
+    return {"status": "ok", "running": True, "version": APP_VERSION}
 
 
 @app.get("/templates")

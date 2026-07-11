@@ -28,7 +28,7 @@ The runtime dependencies explicitly include `paddlepaddle` to ensure `paddleocr`
   - `Dockerfile`: add-on image.
   - `run.sh`: API startup script.
   - `requirements.txt`: Python dependencies.
-  - `app/main.py`: REST API (`/health`, `/templates`, `/ocr`, `/ocr/source`) and Web UI (`/`).
+  - `app/main.py`: REST API (`/health`, `/status`, `/templates`, `/ocr`, `/ocr/source`) and Web UI (`/`).
 
 ## Usage
 
@@ -109,6 +109,20 @@ The same template-selection behavior used by `/ocr` also applies here: explicit 
 ### `GET /templates`
 
 Lists built-in template IDs available for `template_id`.
+
+### `GET /status`
+
+Returns add-on runtime status for integrations that need to verify the add-on is alive.
+
+Example response:
+
+```json
+{
+  "status": "ok",
+  "running": true,
+  "version": "0.3.1"
+}
+```
 
 ## Web UI template selection
 
