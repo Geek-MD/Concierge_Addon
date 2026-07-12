@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.1
+- Added `GET /status` endpoint so Concierge integration can verify the add-on is running.
+- The status response now includes `status`, `running`, and `version`.
+
 ## 0.3.0
 - Added template-driven structured output on top of OCR results using `section -> lines -> boxes` JSON templates.
 - Added fuzzy matching for fixed fields so OCR text can be elastically matched and overwritten with canonical template text (for example accent/sign OCR errors).

@@ -17,9 +17,18 @@ from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse
 from pdf2image import convert_from_bytes
 from paddleocr import PaddleOCR
+from pydantic import BaseModel
 
-app = FastAPI(title="Concierge OCR API", version="0.3.0")
+APP_VERSION = "0.3.1"
+
+app = FastAPI(title="Concierge OCR API", version=APP_VERSION)
 logger = logging.getLogger("concierge_ocr.api")
+
+
+class StatusResponse(BaseModel):
+    status: str
+    running: bool
+    version: str
 
 _OCR_INSTANCE: PaddleOCR | None = None
 HOMEASSISTANT_LOCAL_ALIAS = "homeassistant"
@@ -936,6 +945,11 @@ def web_ui() -> HTMLResponse:
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/status")
+def status() -> StatusResponse:
+    return StatusResponse(status="ok", running=True, version=APP_VERSION)
 
 
 @app.get("/templates")
