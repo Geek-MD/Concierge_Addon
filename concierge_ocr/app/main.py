@@ -937,7 +937,7 @@ def _process_pdf_bytes(
     return structured_payload
 
 
-@app.get("/", response_class=HTMLResponse)
+@app.get("/", response_class=HTMLResponse, status_code=200)
 def web_ui() -> HTMLResponse:
     return HTMLResponse(content=WEB_UI_HTML)
 
