@@ -937,22 +937,22 @@ def _process_pdf_bytes(
     return structured_payload
 
 
-@app.get("/", response_class=HTMLResponse)
+@app.get("/", response_class=HTMLResponse, status_code=200)
 def web_ui() -> HTMLResponse:
     return HTMLResponse(content=WEB_UI_HTML)
 
 
-@app.get("/health")
+@app.get("/health", status_code=200)
 def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
-@app.get("/status")
+@app.get("/status", status_code=200)
 def status() -> StatusResponse:
     return StatusResponse(status="ok", running=True, version=APP_VERSION)
 
 
-@app.get("/templates")
+@app.get("/templates", status_code=200)
 def list_templates() -> dict[str, Any]:
     return {
         "templates": [
@@ -966,7 +966,7 @@ def list_templates() -> dict[str, Any]:
     }
 
 
-@app.post("/ocr")
+@app.post("/ocr", status_code=200)
 async def handle_ocr_request(
     request: Request,
     file: UploadFile | None = File(default=None),
@@ -992,7 +992,7 @@ async def handle_ocr_request(
         raise
 
 
-@app.post("/ocr/source")
+@app.post("/ocr/source", status_code=200)
 async def handle_ocr_source_request(
     source_type: str = Form(...),
     source_value: str = Form(...),
