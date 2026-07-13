@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.3.2
+- Added explicit `status_code=200` to all API endpoint decorators for clearer OpenAPI schema documentation.
+
 ## 0.3.1
 - Added `GET /status` endpoint so Concierge integration can verify the add-on is running.
 - The status response now includes `status`, `running`, and `version`.
