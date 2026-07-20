@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.0
+
+- Added mandatory Bearer-token authentication to every REST API endpoint.
+- Added the password-protected `api_token` add-on option and startup validation.
+- Updated the Web UI to request the token and keep it only in the browser tab.
+
 ## 0.3.2
 - Added explicit `status_code=200` to all API endpoint decorators for clearer OpenAPI schema documentation.
 
