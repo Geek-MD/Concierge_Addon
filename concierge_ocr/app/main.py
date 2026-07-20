@@ -1,3 +1,4 @@
+import hmac
 import ipaddress
 import json
 import logging
@@ -14,15 +15,37 @@ import cv2
 import httpx
 import numpy as np
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from pdf2image import convert_from_bytes
 from paddleocr import PaddleOCR
 from pydantic import BaseModel
 
-APP_VERSION = "0.3.2"
+APP_VERSION = "0.4.0"
 
 app = FastAPI(title="Concierge OCR API", version=APP_VERSION)
 logger = logging.getLogger("concierge_ocr.api")
+API_TOKEN = os.getenv("API_TOKEN", "")
+
+
+@app.middleware("http")
+async def require_api_token(request: Request, call_next: Any) -> Any:
+    """Require a Bearer token for every API route; only the login UI is public."""
+    if request.url.path == "/":
+        return await call_next(request)
+
+    authorization = request.headers.get("Authorization", "")
+    scheme, _, supplied_token = authorization.partition(" ")
+    if (
+        not API_TOKEN
+        or scheme.lower() != "bearer"
+        or not hmac.compare_digest(supplied_token, API_TOKEN)
+    ):
+        return JSONResponse(
+            status_code=401,
+            content={"detail": "Missing or invalid API token"},
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return await call_next(request)
 
 
 class StatusResponse(BaseModel):
@@ -60,6 +83,11 @@ WEB_UI_HTML = r"""<!doctype html>
   <p>Enter a URL (<code>http/https</code>), a local path mounted in Home Assistant (<code>/config</code>, <code>/share</code>, <code>/media</code> or <code>/homeassistant</code> as alias of <code>/config</code>), or upload a PDF file directly.</p>
   <form id="ocrForm">
     <div class="row">
+      <label for="apiToken">API token</label>
+      <input id="apiToken" name="apiToken" type="password" autocomplete="off" required />
+      <span class="hint">The token is kept only in this browser tab.</span>
+    </div>
+    <div class="row">
       <label for="sourceType">Source type</label>
       <select id="sourceType" name="sourceType">
         <option value="url">URL</option>
@@ -96,6 +124,7 @@ WEB_UI_HTML = r"""<!doctype html>
 
   <script>
     const form = document.getElementById('ocrForm');
+    const apiToken = document.getElementById('apiToken');
     const sourceType = document.getElementById('sourceType');
     const templateId = document.getElementById('templateId');
     const sourceValue = document.getElementById('sourceValue');
@@ -107,14 +136,20 @@ WEB_UI_HTML = r"""<!doctype html>
     let latestJson = null;
 
     async function loadTemplates() {
+      if (!apiToken.value) return;
       const basePath = window.location.pathname.replace(/\/+$/, '');
       const endpoint = new URL(`${basePath}/templates`, window.location.origin);
-      const response = await fetch(endpoint);
+      const response = await fetch(endpoint, {
+        headers: { Authorization: `Bearer ${apiToken.value}` },
+      });
       const data = await response.json();
       if (!response.ok) {
         throw new Error(data.detail || 'Could not load templates');
       }
 
+      for (const option of [...templateId.options]) {
+        if (!['__auto__', '__none__'].includes(option.value)) option.remove();
+      }
       for (const template of data.templates || []) {
         const option = document.createElement('option');
         option.value = template.template_id;
@@ -171,7 +206,11 @@ WEB_UI_HTML = r"""<!doctype html>
           }
         }
 
-        const response = await fetch(endpoint, { method: 'POST', body: payload });
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          body: payload,
+          headers: { Authorization: `Bearer ${apiToken.value}` },
+        });
         const data = await response.json();
         if (!response.ok) {
           throw new Error(data.detail || 'Unexpected error');
@@ -194,8 +233,10 @@ WEB_UI_HTML = r"""<!doctype html>
       URL.revokeObjectURL(link.href);
     });
 
-    loadTemplates().catch((error) => {
-      result.value = `Error: ${error.message}`;
+    apiToken.addEventListener('change', () => {
+      loadTemplates().catch((error) => {
+        result.value = `Error: ${error.message}`;
+      });
     });
   </script>
 </body>

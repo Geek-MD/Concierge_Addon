@@ -32,9 +32,10 @@ The runtime dependencies explicitly include `paddlepaddle` to ensure `paddleocr`
 
 ## Usage
 
-1. Add this repository as an **Add-on repository** in Home Assistant.
-2. Install the **Concierge OCR API** add-on.
-3. Start the add-on.
+1. Generate a token with `openssl rand -hex 32`.
+2. Add this repository as an **Add-on repository** in Home Assistant.
+3. Install the **Concierge OCR API** add-on and paste the token into its `api_token` option.
+4. Start the add-on.
 4. Open the Web UI from the add-on page. If you enable **Show in sidebar**, it will also appear in the side panel.
 5. Enter:
    - a PDF URL (`http/https`), or
@@ -51,6 +52,7 @@ Send a PDF over REST:
 
 ```bash
 curl -X POST "http://HOME_ASSISTANT_HOST:8099/ocr" \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
   -F "file=@document.pdf"
 ```
 
