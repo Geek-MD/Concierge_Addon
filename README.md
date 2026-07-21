@@ -32,17 +32,17 @@ The runtime dependencies explicitly include `paddlepaddle` to ensure `paddleocr`
 
 ## Usage
 
-1. Generate a token with `openssl rand -hex 32`.
-2. Add this repository as an **Add-on repository** in Home Assistant.
-3. Install the **Concierge OCR API** add-on and paste the token into its `api_token` option.
-4. Start the add-on.
-4. Open the Web UI from the add-on page. If you enable **Show in sidebar**, it will also appear in the side panel.
-5. Enter:
+1. Add this repository as an **Add-on repository** in Home Assistant.
+2. Install the **Concierge OCR API** add-on.
+3. To generate a token from Home Assistant, set `generate_api_token` to `true`, save the configuration, and start the add-on once.
+4. Copy the generated token from the add-on logs, paste it into the `api_token` option, set `generate_api_token` back to `false`, save, and start the add-on again. You can also generate a token externally with `openssl rand -hex 32`.
+5. Open the Web UI from the add-on page. If you enable **Show in sidebar**, it will also appear in the side panel.
+6. Enter:
    - a PDF URL (`http/https`), or
    - a local Home Assistant path (`/config`, `/share`, `/media`).
    - If your integration returns `/homeassistant/...`, it is also accepted and treated as an alias for `/config/...`.
-6. Run the analysis and download the JSON if needed.
-7. If an analysis fails, review the add-on logs from Home Assistant; request and PDF processing errors are now logged with diagnostic details.
+7. Run the analysis and download the JSON if needed.
+8. If an analysis fails, review the add-on logs from Home Assistant; request and PDF processing errors are now logged with diagnostic details.
 
 ## API REST
 
