@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.1
+
+- Added the `generate_api_token` add-on option to create a secure token from the add-on logs before the API starts.
+- Updated startup validation to guide users through generating, copying, and saving the token in `api_token`.
+
 ## 0.4.0
 
 - Added mandatory Bearer-token authentication to every REST API endpoint.

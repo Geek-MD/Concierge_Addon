@@ -20,7 +20,7 @@ from pdf2image import convert_from_bytes
 from paddleocr import PaddleOCR
 from pydantic import BaseModel
 
-APP_VERSION = "0.4.0"
+APP_VERSION = "0.4.1"
 
 app = FastAPI(title="Concierge OCR API", version=APP_VERSION)
 logger = logging.getLogger("concierge_ocr.api")
