@@ -220,9 +220,19 @@
           "id": "linea_nota_cobro_mes_depto",
           "boxes": [
             {
-              "role": "mixed",
+              "role": "fixed",
+              "canonical_text": "Nota de Cobro",
+              "required": true,
+              "overwrite_ocr_text": true
+            },
+            {
+              "role": "variable",
               "key": "nota_cobro_mes_depto",
-              "text": "Nota de Cobro ??? ???? Depto. ???"
+              "value_type": "string",
+              "required": false,
+              "locator": {
+                "strategy": "same_row_right_join"
+              }
             }
           ]
         },
@@ -411,7 +421,7 @@
             {
               "role": "variable",
               "key": "gasto_comun_porcentaje",
-              "value_type": "string",
+              "value_type": "percentage",
               "required": false,
               "locator": {
                 "strategy": "same_line_right"
@@ -420,7 +430,7 @@
             {
               "role": "variable",
               "key": "gasto_comun_monto",
-              "value_type": "string",
+              "value_type": "currency",
               "required": false,
               "locator": {
                 "strategy": "same_line_right"
@@ -441,7 +451,7 @@
             {
               "role": "variable",
               "key": "provision_fondos_porcentaje",
-              "value_type": "string",
+              "value_type": "percentage",
               "required": false,
               "locator": {
                 "strategy": "same_line_right"
@@ -450,10 +460,11 @@
             {
               "role": "variable",
               "key": "provision_fondos_monto",
-              "value_type": "string",
+              "value_type": "currency",
               "required": false,
               "locator": {
-                "strategy": "same_line_right"
+                "strategy": "same_line_right",
+                "anchor_key": "provision_fondos_porcentaje"
               }
             }
           ]
@@ -486,10 +497,7 @@
       "name": "Tabla Consumos Generales",
       "anchors": [
         "Consumos Generales",
-        "Lectura Anterior",
-        "Lectura Actual",
-        "Agua Caliente",
-        "Subtotal Consumo"
+        "Agua Caliente"
       ],
       "min_score": 0.78,
       "lines": [
@@ -506,7 +514,7 @@
             {
               "role": "variable",
               "key": "agua_caliente_lectura_anterior",
-              "value_type": "string",
+              "value_type": "numeric",
               "required": false,
               "locator": {
                 "strategy": "same_line_right"
@@ -515,7 +523,7 @@
             {
               "role": "variable",
               "key": "agua_caliente_lectura_actual",
-              "value_type": "string",
+              "value_type": "numeric",
               "required": false,
               "locator": {
                 "strategy": "same_line_right"
@@ -523,8 +531,8 @@
             },
             {
               "role": "variable",
-              "key": "agua_caliente_consumos",
-              "value_type": "string",
+              "key": "agua_caliente_consumo",
+              "value_type": "numeric",
               "required": false,
               "locator": {
                 "strategy": "same_line_right"
@@ -533,7 +541,7 @@
             {
               "role": "variable",
               "key": "agua_caliente_valor",
-              "value_type": "string",
+              "value_type": "currency",
               "required": false,
               "locator": {
                 "strategy": "same_line_right"
@@ -542,7 +550,7 @@
             {
               "role": "variable",
               "key": "agua_caliente_total",
-              "value_type": "string",
+              "value_type": "currency",
               "required": false,
               "locator": {
                 "strategy": "same_line_right"
@@ -563,7 +571,7 @@
             {
               "role": "variable",
               "key": "subtotal_consumo",
-              "value_type": "string",
+              "value_type": "currency",
               "required": false,
               "locator": {
                 "strategy": "same_line_right"
@@ -580,7 +588,7 @@
         "Gastos por Unidad",
         "Monto",
         "Cargo Fijo",
-        "Subtotal Recarga",
+        "Subtotal Recargos",
         "Total del mes"
       ],
       "min_score": 0.78,
@@ -607,18 +615,18 @@
           ]
         },
         {
-          "id": "linea_subtotal_recarga",
+          "id": "linea_subtotal_recargos",
           "boxes": [
             {
               "role": "fixed",
-              "key": "subtotal_recarga_label",
-              "canonical_text": "Subtotal Recarga",
+              "key": "subtotal_recargos_label",
+              "canonical_text": "Subtotal Recargos",
               "required": true,
               "overwrite_ocr_text": true
             },
             {
               "role": "variable",
-              "key": "subtotal_recarga",
+              "key": "subtotal_recargos",
               "value_type": "string",
               "required": false,
               "locator": {

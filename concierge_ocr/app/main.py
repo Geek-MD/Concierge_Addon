@@ -20,7 +20,7 @@ from pdf2image import convert_from_bytes
 from paddleocr import PaddleOCR
 from pydantic import BaseModel
 
-APP_VERSION = "0.4.2"
+APP_VERSION = "0.4.3"
 
 app = FastAPI(title="Concierge OCR API", version=APP_VERSION)
 logger = logging.getLogger("concierge_ocr.api")
@@ -471,6 +471,7 @@ def _find_variable_value(
     flattened_lines: list[dict[str, Any]],
     locator: dict[str, Any],
     section_page_hint: int | None,
+    value_type: str = "string",
 ) -> dict[str, Any] | None:
     """Find a variable-value OCR line using the configured locator strategy and optional anchor line."""
     strategy = str(locator.get("strategy", "nearest_right_or_below"))
@@ -480,13 +481,19 @@ def _find_variable_value(
         for line in flattened_lines:
             if section_page_hint is not None and line["page"] != section_page_hint:
                 continue
-            if not line["used_variable"] and line["text"]:
+            if (
+                not line["used_variable"]
+                and line["text"]
+                and _variable_value_matches(line["text"], value_type)
+            ):
                 return line
         return None
 
     candidates: list[tuple[tuple[int, float], dict[str, Any]]] = []
     for line in flattened_lines:
         if line["used_variable"] or not line["text"]:
+            continue
+        if not _variable_value_matches(line["text"], value_type):
             continue
         if line["page"] != anchor_line["page"]:
             continue
@@ -502,6 +509,36 @@ def _find_variable_value(
 
     candidates.sort(key=lambda item: (item[0][0], item[0][1], -item[1]["confidence"]))
     return candidates[0][1]
+
+
+def _variable_value_matches(value: str, value_type: str) -> bool:
+    """Return whether OCR text has the shape required by a template value type."""
+    normalized_type = value_type.strip().lower()
+    if normalized_type in {"number", "numeric"}:
+        return re.fullmatch(r"[-+]?\d[\d.,]*", value.strip()) is not None
+    if normalized_type in {"amount", "currency"}:
+        # Monetary cells in these statements normally include '$', but accepting a
+        # bare formatted integer also handles OCR engines that drop the symbol.
+        return re.fullmatch(r"\$?\s*[-+]?\d[\d.,]*", value.strip()) is not None
+    if normalized_type == "percentage":
+        return re.fullmatch(r"[-+]?\d[\d.,]*\s*%", value.strip()) is not None
+    return True
+
+
+def _find_variable_values_on_row(
+    anchor_line: dict[str, Any],
+    flattened_lines: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Return all unused OCR cells to the right of an anchor on its visual row."""
+    candidates: list[tuple[tuple[int, float], dict[str, Any]]] = []
+    for line in flattened_lines:
+        if line is anchor_line or line["used_variable"] or not line["text"]:
+            continue
+        cost = _calculate_candidate_priority(anchor_line, line, "same_row_right", 0)
+        if cost is not None:
+            candidates.append((cost, line))
+    candidates.sort(key=lambda item: (item[1].get("center_x") or 0.0, item[0][1]))
+    return [line for _, line in candidates]
 
 
 def _find_mixed_value(
@@ -594,6 +631,7 @@ def _apply_template(ocr_payload: dict[str, Any], template: dict[str, Any]) -> di
         if is_section_match:
             for line_template in section.get("lines", []):
                 fixed_matches: dict[int, dict[str, Any]] = {}
+                variable_lines: dict[str, dict[str, Any]] = {}
 
                 for box_index, box in enumerate(line_template.get("boxes", [])):
                     if str(box.get("role", "")).lower() != "fixed":
@@ -657,11 +695,38 @@ def _apply_template(ocr_payload: dict[str, Any], template: dict[str, Any]) -> di
                     locator_value = box.get("locator")
                     locator = locator_value if isinstance(locator_value, dict) else {}
                     first_fixed_match = next(iter(fixed_matches.values()), None)
-                    anchor_line = first_fixed_match["line"] if first_fixed_match else None
-                    variable_line = _find_variable_value(anchor_line, flattened_lines, locator, section_page_hint)
+                    anchor_key = str(locator.get("anchor_key", "")).strip()
+                    anchor_line = variable_lines.get(anchor_key)
+                    if anchor_line is None:
+                        anchor_line = first_fixed_match["line"] if first_fixed_match else None
+                    strategy = str(locator.get("strategy", "nearest_right_or_below"))
+                    if strategy == "same_row_right_join" and anchor_line is not None:
+                        row_lines = _find_variable_values_on_row(anchor_line, flattened_lines)
+                        variable_line = row_lines[0] if row_lines else None
+                        variable_text = " ".join(line["text"] for line in row_lines) or None
+                    else:
+                        value_type = str(box.get("value_type", "string"))
+                        variable_line = _find_variable_value(
+                            anchor_line,
+                            flattened_lines,
+                            locator,
+                            section_page_hint,
+                            value_type,
+                        )
+                        variable_text = variable_line["text"] if variable_line else None
+
+                    value_type = str(box.get("value_type", "string"))
+                    if variable_text is not None and not _variable_value_matches(variable_text, value_type):
+                        variable_line = None
+                        variable_text = None
                     if variable_line is not None:
-                        variable_line["used_variable"] = True
-                    fields[key] = variable_line["text"] if variable_line else None
+                        if strategy == "same_row_right_join":
+                            for row_line in row_lines:
+                                row_line["used_variable"] = True
+                        else:
+                            variable_line["used_variable"] = True
+                        variable_lines[key] = variable_line
+                    fields[key] = variable_text
                     line_results[key] = {
                         "value": fields[key],
                         "page": variable_line["page"] if variable_line else None,
