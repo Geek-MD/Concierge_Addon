@@ -499,7 +499,7 @@
         "Consumos Generales",
         "Agua Caliente"
       ],
-      "min_score": 0.78,
+      "min_score": 0.5,
       "lines": [
         {
           "id": "linea_agua_caliente",

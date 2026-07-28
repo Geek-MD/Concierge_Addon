@@ -166,6 +166,20 @@ class TableLocatorTests(unittest.TestCase):
 
         self.assertEqual(amount["locator"]["anchor_key"], "provision_fondos_porcentaje")
 
+    def test_consumption_section_accepts_its_data_row_anchor_alone(self) -> None:
+        template = json.loads(TEMPLATE_FILE.read_text(encoding="utf-8"))
+        consumption = next(
+            section
+            for section in template["sections"]
+            if section["id"] == "tabla_consumos_generales"
+        )
+
+        # PaddleOCR can omit the spanning table title while still recognizing the
+        # Agua Caliente row and every value in it. One exact anchor out of the two
+        # produces a section score of 0.5 and must allow extraction to proceed.
+        self.assertEqual(consumption["anchors"], ["Consumos Generales", "Agua Caliente"])
+        self.assertLessEqual(consumption["min_score"], 0.5)
+
 
 if __name__ == "__main__":
     unittest.main()

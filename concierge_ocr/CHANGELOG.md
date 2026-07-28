@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.5
+
+- Fixed hot-water consumption extraction when OCR recognizes the `Agua Caliente` data row but omits the spanning `Consumos Generales` table heading.
+
 ## 0.4.4
 
 - Fixed template extraction failures when a `same_row_right_join` field has no matching anchor.
