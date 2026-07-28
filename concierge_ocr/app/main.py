@@ -20,7 +20,7 @@ from pdf2image import convert_from_bytes
 from paddleocr import PaddleOCR
 from pydantic import BaseModel
 
-APP_VERSION = "0.4.5"
+APP_VERSION = "0.5.0"
 
 app = FastAPI(title="Concierge OCR API", version=APP_VERSION)
 logger = logging.getLogger("concierge_ocr.api")
@@ -60,190 +60,11 @@ RESOLVED_LOCAL_BASE_DIRS = tuple(
     path.expanduser().resolve() for path in LOCAL_ALLOWED_BASE_DIRS if path.expanduser().exists()
 )
 
-WEB_UI_HTML = r"""<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Concierge OCR Web UI</title>
-  <style>
-    body { font-family: system-ui, sans-serif; margin: 1rem; max-width: 900px; }
-    h1 { margin-top: 0; }
-    form { display: grid; gap: .75rem; margin-bottom: 1rem; }
-    select, input, button, textarea { font: inherit; padding: .5rem; }
-    textarea { min-height: 240px; width: 100%; }
-    .row { display: grid; gap: .5rem; }
-    .hint { color: #666; font-size: .9rem; }
-    .actions { display: flex; gap: .5rem; flex-wrap: wrap; }
-    [hidden] { display: none !important; }
-  </style>
-</head>
-<body>
-  <h1>Concierge OCR Web UI</h1>
-  <p>Enter a URL (<code>http/https</code>), a local path mounted in Home Assistant (<code>/config</code>, <code>/share</code>, <code>/media</code> or <code>/homeassistant</code> as alias of <code>/config</code>), or upload a PDF file directly.</p>
-  <form id="ocrForm">
-    <div class="row">
-      <label for="apiToken">API token</label>
-      <input id="apiToken" name="apiToken" type="password" autocomplete="off" required />
-      <span class="hint">The token is kept only in this browser tab.</span>
-    </div>
-    <div class="row">
-      <label for="sourceType">Source type</label>
-      <select id="sourceType" name="sourceType">
-        <option value="url">URL</option>
-        <option value="local_path">Local path</option>
-        <option value="file_upload">Upload file</option>
-      </select>
-    </div>
-    <div class="row">
-      <label for="templateId">Template</label>
-      <select id="templateId" name="templateId">
-        <option value="__auto__">Auto-detect</option>
-        <option value="__none__">None (raw OCR)</option>
-      </select>
-      <span class="hint">Choose a built-in template, auto-detect the best match, or return raw OCR.</span>
-    </div>
-    <div class="row" id="sourceValueRow">
-      <label for="sourceValue">PDF URL or path</label>
-      <input id="sourceValue" name="sourceValue" placeholder="https://.../file.pdf or /config/file.pdf (/homeassistant/... also supported)" required />
-      <span class="hint">Only PDF files are supported.</span>
-    </div>
-    <div class="row" id="fileUploadRow" hidden>
-      <label for="fileInput">PDF file</label>
-      <input id="fileInput" name="fileInput" type="file" accept=".pdf,application/pdf" />
-      <span class="hint">Only PDF files are supported.</span>
-    </div>
-    <div class="actions">
-      <button type="submit">Analyze PDF</button>
-      <button id="downloadBtn" type="button" disabled>Download JSON</button>
-    </div>
-  </form>
-
-  <label for="result">JSON result</label>
-  <textarea id="result" readonly placeholder="The JSON response will appear here..."></textarea>
-
-  <script>
-    const form = document.getElementById('ocrForm');
-    const apiToken = document.getElementById('apiToken');
-    const sourceType = document.getElementById('sourceType');
-    const templateId = document.getElementById('templateId');
-    const sourceValue = document.getElementById('sourceValue');
-    const fileInput = document.getElementById('fileInput');
-    const sourceValueRow = document.getElementById('sourceValueRow');
-    const fileUploadRow = document.getElementById('fileUploadRow');
-    const result = document.getElementById('result');
-    const downloadBtn = document.getElementById('downloadBtn');
-    let latestJson = null;
-
-    async function loadTemplates() {
-      if (!apiToken.value) return;
-      const basePath = window.location.pathname.replace(/\/+$/, '');
-      const endpoint = new URL(`${basePath}/templates`, window.location.origin);
-      const response = await fetch(endpoint, {
-        headers: { Authorization: `Bearer ${apiToken.value}` },
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.detail || 'Could not load templates');
-      }
-
-      for (const option of [...templateId.options]) {
-        if (!['__auto__', '__none__'].includes(option.value)) option.remove();
-      }
-      for (const template of data.templates || []) {
-        const option = document.createElement('option');
-        option.value = template.template_id;
-        option.textContent = template.document_type
-          ? `${template.template_id} (${template.document_type})`
-          : template.template_id;
-        templateId.appendChild(option);
-      }
-    }
-
-    sourceType.addEventListener('change', () => {
-      const isUpload = sourceType.value === 'file_upload';
-      sourceValueRow.hidden = isUpload;
-      fileUploadRow.hidden = !isUpload;
-      sourceValue.required = !isUpload;
-      fileInput.required = isUpload;
-    });
-
-    form.addEventListener('submit', async (event) => {
-      event.preventDefault();
-      result.value = 'Processing...';
-      downloadBtn.disabled = true;
-      latestJson = null;
-
-      const payload = new FormData();
-
-      try {
-        const basePath = window.location.pathname.replace(/\/+$/, '');
-        let endpoint;
-        const selectedTemplate = templateId.value;
-        if (sourceType.value === 'file_upload') {
-          const file = fileInput.files[0];
-          if (!file) {
-            throw new Error('Please select a PDF file to upload');
-          }
-          if (file.type && file.type !== 'application/pdf') {
-            throw new Error('The selected file is not a PDF');
-          }
-          payload.append('file', file, file.name);
-          endpoint = new URL(`${basePath}/ocr`, window.location.origin);
-          if (selectedTemplate === '__none__') {
-            endpoint.searchParams.set('auto_detect_template', 'false');
-          } else if (selectedTemplate !== '__auto__') {
-            endpoint.searchParams.set('template_id', selectedTemplate);
-          }
-        } else {
-          payload.append('source_type', sourceType.value);
-          payload.append('source_value', sourceValue.value.trim());
-          endpoint = new URL(`${basePath}/ocr/source`, window.location.origin);
-          if (selectedTemplate === '__none__') {
-            payload.append('auto_detect_template', 'false');
-          } else if (selectedTemplate !== '__auto__') {
-            payload.append('template_id', selectedTemplate);
-          }
-        }
-
-        const response = await fetch(endpoint, {
-          method: 'POST',
-          body: payload,
-          headers: { Authorization: `Bearer ${apiToken.value}` },
-        });
-        const data = await response.json();
-        if (!response.ok) {
-          throw new Error(data.detail || 'Unexpected error');
-        }
-        latestJson = data;
-        result.value = JSON.stringify(data, null, 2);
-        downloadBtn.disabled = false;
-      } catch (error) {
-        result.value = `Error: ${error.message}`;
-      }
-    });
-
-    downloadBtn.addEventListener('click', () => {
-      if (!latestJson) return;
-      const blob = new Blob([JSON.stringify(latestJson, null, 2)], { type: 'application/json' });
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.download = 'ocr_result.json';
-      link.click();
-      URL.revokeObjectURL(link.href);
-    });
-
-    apiToken.addEventListener('change', () => {
-      loadTemplates().catch((error) => {
-        result.value = `Error: ${error.message}`;
-      });
-    });
-  </script>
-</body>
-</html>
-"""
+WEB_UI_HTML = (Path(__file__).parent / "web_ui.html").read_text(encoding="utf-8")
 
 _TEMPLATES_DIR = Path(__file__).parent / "templates"
+_USER_TEMPLATES_DIR = Path(os.getenv("TEMPLATE_STORAGE_DIR", "/data/templates"))
+_TEMPLATE_ID_PATTERN = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$")
 
 
 def _load_builtin_templates() -> dict[str, dict[str, Any]]:
@@ -265,6 +86,34 @@ def _load_builtin_templates() -> dict[str, dict[str, Any]]:
 
 
 BUILTIN_TEMPLATES: dict[str, dict[str, Any]] = _load_builtin_templates()
+
+
+def _load_user_templates() -> dict[str, dict[str, Any]]:
+    """Load editable templates from persistent add-on storage."""
+    templates: dict[str, dict[str, Any]] = {}
+    if not _USER_TEMPLATES_DIR.is_dir():
+        return templates
+    for template_file in sorted(_USER_TEMPLATES_DIR.glob("*.json")):
+        try:
+            with template_file.open(encoding="utf-8") as fh:
+                data = json.load(fh)
+            template_id = data.get("template_id")
+            if (
+                template_id
+                and _TEMPLATE_ID_PATTERN.fullmatch(template_id)
+                and template_id not in BUILTIN_TEMPLATES
+            ):
+                templates[template_id] = data
+        except (OSError, json.JSONDecodeError) as exc:
+            logger.warning("Failed to load user template %s: %s", template_file.name, exc)
+    return templates
+
+
+def _all_templates() -> dict[str, dict[str, Any]]:
+    """Return built-in and user templates, with user templates kept separate by ID."""
+    templates = dict(BUILTIN_TEMPLATES)
+    templates.update(_load_user_templates())
+    return templates
 
 
 def get_ocr() -> PaddleOCR:
@@ -924,10 +773,10 @@ def _resolve_template(template_id: str | None, template_json: str | None) -> dic
         return _validate_template(template)
 
     if template_id:
-        builtin = BUILTIN_TEMPLATES.get(template_id)
-        if builtin is None:
+        stored_template = _all_templates().get(template_id)
+        if stored_template is None:
             raise HTTPException(status_code=404, detail=f"Unknown template_id '{template_id}'")
-        return _validate_template(builtin)
+        return _validate_template(stored_template)
 
     return None
 
@@ -1071,7 +920,7 @@ def _process_pdf_bytes(
 
     auto_detected = False
     if template is None and auto_detect:
-        template = _detect_best_template(raw_payload, BUILTIN_TEMPLATES)
+        template = _detect_best_template(raw_payload, _all_templates())
         auto_detected = template is not None
 
     if template is None:
@@ -1100,16 +949,69 @@ def status() -> StatusResponse:
 
 @app.get("/templates", status_code=200)
 def list_templates() -> dict[str, Any]:
+    user_templates = _load_user_templates()
     return {
         "templates": [
             {
                 "template_id": template["template_id"],
                 "document_type": template.get("document_type"),
                 "section_count": len(template.get("sections", [])),
+                "editable": template_id in user_templates,
             }
-            for template in BUILTIN_TEMPLATES.values()
+            for template_id, template in _all_templates().items()
         ]
     }
+
+
+@app.get("/templates/{template_id}", status_code=200)
+def get_template(template_id: str) -> dict[str, Any]:
+    template = _all_templates().get(template_id)
+    if template is None:
+        raise HTTPException(status_code=404, detail=f"Unknown template_id '{template_id}'")
+    return {"template": template, "editable": template_id in _load_user_templates()}
+
+
+@app.put("/templates/{template_id}", status_code=200)
+def save_template(template_id: str, template: dict[str, Any]) -> dict[str, Any]:
+    if not _TEMPLATE_ID_PATTERN.fullmatch(template_id):
+        raise HTTPException(
+            status_code=400,
+            detail="template_id must contain 1-64 letters, numbers, underscores, or hyphens",
+        )
+    if template_id in BUILTIN_TEMPLATES:
+        raise HTTPException(status_code=409, detail="Built-in templates are read-only; save with a new ID")
+    if template.get("template_id") != template_id:
+        raise HTTPException(status_code=400, detail="The URL and JSON template_id values must match")
+    validated = _validate_template(template)
+    _USER_TEMPLATES_DIR.mkdir(parents=True, exist_ok=True)
+    target = _USER_TEMPLATES_DIR / f"{template_id}.json"
+    temporary = target.with_suffix(".json.tmp")
+    try:
+        temporary.write_text(
+            json.dumps(validated, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+        )
+        temporary.replace(target)
+    except OSError as exc:
+        logger.exception("Could not save user template %s", template_id)
+        raise HTTPException(status_code=500, detail="Could not persist the template") from exc
+    return {"template": validated, "editable": True}
+
+
+@app.delete("/templates/{template_id}", status_code=200)
+def delete_template(template_id: str) -> dict[str, str]:
+    if not _TEMPLATE_ID_PATTERN.fullmatch(template_id):
+        raise HTTPException(status_code=404, detail=f"Unknown editable template_id '{template_id}'")
+    if template_id in BUILTIN_TEMPLATES:
+        raise HTTPException(status_code=409, detail="Built-in templates cannot be deleted")
+    target = _USER_TEMPLATES_DIR / f"{template_id}.json"
+    if not target.is_file():
+        raise HTTPException(status_code=404, detail=f"Unknown editable template_id '{template_id}'")
+    try:
+        target.unlink()
+    except OSError as exc:
+        logger.exception("Could not delete user template %s", template_id)
+        raise HTTPException(status_code=500, detail="Could not delete the template") from exc
+    return {"deleted": template_id}
 
 
 @app.post("/ocr", status_code=200)
