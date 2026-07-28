@@ -20,7 +20,7 @@ from pdf2image import convert_from_bytes
 from paddleocr import PaddleOCR
 from pydantic import BaseModel
 
-APP_VERSION = "0.4.1"
+APP_VERSION = "0.4.2"
 
 app = FastAPI(title="Concierge OCR API", version=APP_VERSION)
 logger = logging.getLogger("concierge_ocr.api")
@@ -344,6 +344,24 @@ def _box_center(box: Any) -> tuple[float | None, float | None]:
     return x_center, y_center
 
 
+def _box_dimensions(box: Any) -> tuple[float | None, float | None]:
+    """Return the width and height of an OCR quadrilateral's bounding rectangle."""
+    if not isinstance(box, list) or not box:
+        return None, None
+    coordinates = [
+        (float(point[0]), float(point[1]))
+        for point in box
+        if isinstance(point, (list, tuple))
+        and len(point) == 2
+        and isinstance(point[0], (int, float))
+        and isinstance(point[1], (int, float))
+    ]
+    if not coordinates:
+        return None, None
+    xs, ys = zip(*coordinates)
+    return max(xs) - min(xs), max(ys) - min(ys)
+
+
 def _flatten_ocr_lines(ocr_payload: dict[str, Any], matching_cfg: dict[str, Any]) -> list[dict[str, Any]]:
     """Flatten OCR pages/lines into searchable line records with normalized text and coordinates."""
     flattened: list[dict[str, Any]] = []
@@ -352,6 +370,7 @@ def _flatten_ocr_lines(ocr_payload: dict[str, Any], matching_cfg: dict[str, Any]
         for line_index, line in enumerate(page.get("lines", [])):
             text = str(line.get("text", "")).strip()
             center_x, center_y = _box_center(line.get("box"))
+            width, height = _box_dimensions(line.get("box"))
             flattened.append(
                 {
                     "page": page_number,
@@ -362,6 +381,8 @@ def _flatten_ocr_lines(ocr_payload: dict[str, Any], matching_cfg: dict[str, Any]
                     "box": line.get("box"),
                     "center_x": center_x,
                     "center_y": center_y,
+                    "width": width,
+                    "height": height,
                     "used_variable": False,
                 }
             )
@@ -404,12 +425,28 @@ def _calculate_candidate_priority(
     candidate_x = candidate_line["center_x"]
     candidate_y = candidate_line["center_y"]
 
-    if strategy == "same_line_right":
-        if line_delta != 0:
-            return None
+    if strategy in {"same_line_right", "same_row_right"}:
         if anchor_x is not None and candidate_x is not None and candidate_x <= anchor_x:
             return None
-        return 0, abs((candidate_x or 0.0) - (anchor_x or 0.0))
+
+        # PaddleOCR emits every detected text box as an individual item.  Consequently,
+        # two cells in the same visual table row virtually never share a line_index.
+        # Compare their vertical centres instead, allowing for normal OCR box jitter.
+        if anchor_y is not None and candidate_y is not None:
+            anchor_height = float(anchor_line.get("height") or 0.0)
+            candidate_height = float(candidate_line.get("height") or 0.0)
+            configured_tolerance = max(anchor_height, candidate_height) * 0.75
+            row_tolerance = max(configured_tolerance, 8.0)
+            vertical_distance = abs(candidate_y - anchor_y)
+            if vertical_distance > row_tolerance:
+                return None
+            return 0, abs(candidate_x - anchor_x) + vertical_distance
+
+        # Retain the old index-based fallback for synthetic/custom OCR payloads that
+        # omit bounding boxes.
+        if line_delta != 0:
+            return None
+        return 0, 0.0
 
     if strategy == "below":
         if line_delta <= 0 or line_delta > max_distance:
