@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Concierge OCR</title>
+  <style>
+    :root { color-scheme: light dark; --accent:#2563eb; --border:#94a3b8; --muted:#64748b; }
+    * { box-sizing:border-box; }
+    body { font-family:system-ui,sans-serif; margin:0 auto; padding:1.25rem; max-width:1100px; }
+    h1 { margin:.25rem 0 1rem; }
+    .tabs { display:flex; gap:.25rem; border-bottom:1px solid var(--border); margin-bottom:1rem; }
+    .tab { background:none; border:0; border-bottom:3px solid transparent; padding:.75rem 1rem; cursor:pointer; }
+    .tab.active { color:var(--accent); border-color:var(--accent); font-weight:700; }
+    .panel[hidden] { display:none; }
+    form,.grid { display:grid; gap:.8rem; }
+    .row { display:grid; gap:.35rem; }
+    .toolbar { display:flex; flex-wrap:wrap; gap:.5rem; align-items:end; }
+    .toolbar .grow { flex:1 1 260px; }
+    input,select,button,textarea { font:inherit; padding:.6rem; }
+    button { cursor:pointer; }
+    button.primary { color:white; background:var(--accent); border:1px solid var(--accent); border-radius:4px; }
+    button.danger { color:#dc2626; }
+    textarea { min-height:250px; width:100%; font-family:ui-monospace,monospace; tab-size:2; }
+    .code-editor { position:relative; min-height:460px; border:1px solid var(--border); border-radius:4px; overflow:hidden; background:#0f172a; }
+    #templateHighlight,#templateEditor { margin:0; border:0; min-height:460px; width:100%; padding:.75rem; font:14px/1.5 ui-monospace,monospace; tab-size:2; white-space:pre; overflow:auto; }
+    #templateHighlight { position:absolute; inset:0; pointer-events:none; color:#e2e8f0; }
+    #templateEditor { position:relative; display:block; resize:vertical; background:transparent; color:transparent; caret-color:#f8fafc; -webkit-text-fill-color:transparent; }
+    #templateEditor::selection { background:#475569; }
+    .json-key { color:#7dd3fc; } .json-string { color:#86efac; } .json-number { color:#fdba74; }
+    .json-boolean { color:#c4b5fd; } .json-null { color:#fda4af; }
+    .hint,.status { color:var(--muted); font-size:.9rem; }
+    .status { min-height:1.4rem; }
+    .status.error { color:#dc2626; }
+    .status.success { color:#15803d; }
+    .validation-help { margin:.25rem 0 0; padding:.75rem; border-left:4px solid #dc2626; background:color-mix(in srgb,#dc2626 10%,transparent); white-space:pre-wrap; }
+  </style>
+</head>
+<body>
+  <h1>Concierge OCR</h1>
+  <div class="row" style="margin-bottom:1rem">
+    <label for="apiToken">Token de API</label>
+    <input id="apiToken" type="password" autocomplete="off" placeholder="Requerido para analizar y administrar plantillas">
+    <span class="hint">El token se conserva únicamente en esta pestaña del navegador.</span>
+  </div>
+  <nav class="tabs" aria-label="Secciones">
+    <button class="tab active" data-panel="ocrPanel">Analizar PDF</button>
+    <button class="tab" data-panel="templatesPanel">Plantillas de servicios</button>
+  </nav>
+
+  <section id="ocrPanel" class="panel">
+    <form id="ocrForm">
+      <div class="row"><label for="sourceType">Origen</label><select id="sourceType"><option value="url">URL</option><option value="local_path">Ruta local</option><option value="file_upload">Subir archivo</option></select></div>
+      <div class="row"><label for="templateId">Plantilla</label><select id="templateId"><option value="__auto__">Detección automática</option><option value="__none__">Sin plantilla (OCR sin procesar)</option></select></div>
+      <div class="row" id="sourceValueRow"><label for="sourceValue">URL o ruta del PDF</label><input id="sourceValue" placeholder="https://…/archivo.pdf o /config/archivo.pdf" required></div>
+      <div class="row" id="fileUploadRow" hidden><label for="fileInput">Archivo PDF</label><input id="fileInput" type="file" accept=".pdf,application/pdf"></div>
+      <div class="toolbar"><button class="primary" type="submit">Analizar PDF</button><button id="downloadBtn" type="button" disabled>Descargar JSON</button></div>
+    </form>
+    <div class="row"><label for="result">Resultado JSON</label><textarea id="result" readonly placeholder="El resultado aparecerá aquí…"></textarea></div>
+  </section>
+
+  <section id="templatesPanel" class="panel" hidden>
+    <p>Crea plantillas desde cero o parte de un ejemplo genérico. Las plantillas guardadas quedan disponibles inmediatamente en el análisis OCR.</p>
+    <div class="toolbar">
+      <div class="row grow"><label for="editorTemplateId">Plantilla guardada</label><select id="editorTemplateId"><option value="">Selecciona una plantilla…</option></select></div>
+      <button id="openTemplate" type="button">Abrir</button>
+      <button id="newBlank" type="button">Nueva en blanco</button>
+      <button id="newGeneric" type="button">Usar plantilla genérica</button>
+      <button id="importTemplate" type="button">Importar JSON</button>
+      <input id="importFile" type="file" accept=".json,application/json" hidden>
+    </div>
+    <div class="row"><label for="templateEditor">Editor JSON con resaltado de sintaxis</label><div class="code-editor"><pre id="templateHighlight" aria-hidden="true"></pre><textarea id="templateEditor" spellcheck="false" wrap="off" placeholder="Crea o abre una plantilla…"></textarea></div></div>
+    <div class="toolbar">
+      <button id="saveTemplate" class="primary" type="button">Guardar</button>
+      <button id="deleteTemplate" class="danger" type="button">Borrar</button>
+      <button id="exportTemplate" type="button">Exportar JSON</button>
+      <button id="validateTemplate" type="button">Verificar JSON</button>
+      <button id="formatTemplate" type="button">Formatear JSON</button>
+    </div>
+    <p id="templateStatus" class="status" role="status"></p>
+    <pre id="validationHelp" class="validation-help" role="alert" hidden></pre>
+  </section>
+<script>
+const $ = id => document.getElementById(id);
+const apiToken=$('apiToken'), templateId=$('templateId'), editorTemplateId=$('editorTemplateId');
+let templates=[], latestJson=null, openedEditable=false;
+const basePath=window.location.pathname.replace(/\/+$/, '');
+const headers=()=>({Authorization:`Bearer ${apiToken.value}`});
+const genericTemplate={template_id:'mi_servicio',document_type:'servicio_generico',matching:{normalize_accents:true,ignore_case:true,collapse_whitespace:true,default_fuzzy_threshold:0.82},sections:[{id:'datos_servicio',name:'Datos del servicio',anchors:['Nombre del servicio'],lines:[{id:'nombre',boxes:[{role:'fixed',key:'nombre_label',canonical_text:'Nombre del servicio',overwrite_ocr_text:true},{role:'variable',key:'nombre',locator:{strategy:'nearest_right_or_below',max_distance:2}}]}]}]};
+const blankTemplate=()=>({template_id:'nueva_plantilla',document_type:'',sections:[{id:'seccion_1',name:'Primera sección',anchors:[],lines:[]}]});
+function status(message,type=''){ const el=$('templateStatus'); el.textContent=message; el.className=`status ${type}`; }
+function escapeHtml(text){ return text.replace(/[&<>]/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[char])); }
+function highlightJson(){ const escaped=escapeHtml($('templateEditor').value); $('templateHighlight').innerHTML=escaped.replace(/("(?:\\u[\da-fA-F]{4}|\\[^u]|[^\\"])*"\s*:)|("(?:\\u[\da-fA-F]{4}|\\[^u]|[^\\"])*")|\b(true|false)\b|\b(null)\b|(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)/g,(match,key,string,bool,nil,number)=>`<span class="${key?'json-key':string?'json-string':bool?'json-boolean':nil?'json-null':'json-number'}">${match}</span>`); }
+function jsonErrorHelp(error){ const source=$('templateEditor').value; const match=error.message.match(/position\s+(\d+)/i); let position=match?Number(match[1]):0; if(!match&&/end of JSON/i.test(error.message)) position=source.length; const before=source.slice(0,position),line=before.split('\n').length,column=position-before.lastIndexOf('\n'); const lines=source.split('\n'),badLine=lines[line-1]||'',pointer=`${' '.repeat(Math.max(0,column-1))}^`; let tip='Revisa comas, comillas y llaves cerca de la posición indicada.'; if(/property name|double-quoted/i.test(error.message)) tip='Las claves deben estar entre comillas dobles, por ejemplo: "nombre": "valor".'; else if(/end of JSON/i.test(error.message)) tip='Parece faltar una llave }, un corchete ] o un valor al final del documento.'; else if(/unexpected token|unexpected character/i.test(error.message)) tip='Elimina el carácter indicado o comprueba si falta una coma antes de él.'; return `Línea ${line}, columna ${column}\n${badLine}\n${pointer}\n\nSugerencia: ${tip}`; }
+function validateJson(showSuccess=true){ const help=$('validationHelp'); try{ const value=JSON.parse($('templateEditor').value); help.hidden=true; help.textContent=''; if(showSuccess) status('El JSON es válido y está listo para guardarse.','success'); return value; }catch(error){ status(`JSON incorrecto: ${error.message}`,'error'); help.textContent=jsonErrorHelp(error); help.hidden=false; const match=error.message.match(/position\s+(\d+)/i); if(match){ $('templateEditor').focus(); $('templateEditor').setSelectionRange(Number(match[1]),Number(match[1])+1); } return null; } }
+async function api(path,options={}){ if(!apiToken.value) throw new Error('Ingresa primero el token de API.'); const response=await fetch(`${basePath}${path}`,{...options,headers:{...headers(),...(options.headers||{})}}); const data=await response.json().catch(()=>({})); if(!response.ok) throw new Error(data.detail||`Error HTTP ${response.status}`); return data; }
+async function loadTemplates(){ const data=await api('/templates'); templates=data.templates||[]; for(const select of [templateId,editorTemplateId]){ [...select.options].filter(o=>!o.value.startsWith('__')&&o.value).forEach(o=>o.remove()); for(const item of templates){ const o=document.createElement('option'); o.value=item.template_id; o.textContent=`${item.template_id}${item.document_type?' — '+item.document_type:''}${item.editable?'':' (incluida)'}`; o.dataset.editable=item.editable; select.appendChild(o); } } }
+function showJson(value,editable=true){ $('templateEditor').value=JSON.stringify(value,null,2); openedEditable=editable; $('deleteTemplate').disabled=!editable; $('validationHelp').hidden=true; highlightJson(); }
+document.querySelectorAll('.tab').forEach(button=>button.addEventListener('click',()=>{ document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x===button)); document.querySelectorAll('.panel').forEach(x=>x.hidden=x.id!==button.dataset.panel); if(button.dataset.panel==='templatesPanel') loadTemplates().catch(e=>status(e.message,'error')); }));
+apiToken.addEventListener('change',()=>loadTemplates().catch(e=>$('result').value=`Error: ${e.message}`));
+$('sourceType').addEventListener('change',()=>{ const upload=$('sourceType').value==='file_upload'; $('sourceValueRow').hidden=upload; $('fileUploadRow').hidden=!upload; $('sourceValue').required=!upload; $('fileInput').required=upload; });
+$('openTemplate').addEventListener('click',async()=>{ try{ if(!editorTemplateId.value) throw new Error('Selecciona una plantilla para abrir.'); const data=await api(`/templates/${encodeURIComponent(editorTemplateId.value)}`); showJson(data.template,data.editable); status(data.editable?'Plantilla editable abierta.':'Plantilla incluida abierta en modo lectura. Cambia su ID para guardar una copia.','success'); }catch(e){status(e.message,'error')} });
+$('newBlank').addEventListener('click',()=>{editorTemplateId.value='';showJson(blankTemplate());status('Nueva plantilla creada. Cambia su ID antes de guardarla.');});
+$('newGeneric').addEventListener('click',()=>{editorTemplateId.value='';showJson(genericTemplate);status('Plantilla genérica cargada. Personalízala y guárdala.');});
+$('templateEditor').addEventListener('input',()=>{ highlightJson(); $('validationHelp').hidden=true; });
+$('templateEditor').addEventListener('scroll',()=>{ $('templateHighlight').scrollTop=$('templateEditor').scrollTop; $('templateHighlight').scrollLeft=$('templateEditor').scrollLeft; });
+$('validateTemplate').addEventListener('click',()=>validateJson());
+$('formatTemplate').addEventListener('click',()=>{const value=validateJson(false);if(value){showJson(value,openedEditable);status('JSON válido y formateado.','success')}});
+$('saveTemplate').addEventListener('click',async()=>{try{const value=validateJson(false);if(!value)return;const id=value.template_id;if(!id)throw new Error('El JSON debe incluir template_id.');const data=await api(`/templates/${encodeURIComponent(id)}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(value)});showJson(data.template,true);await loadTemplates();editorTemplateId.value=id;status(`Plantilla “${id}” guardada.`, 'success')}catch(e){status(e.message,'error')}});
+$('deleteTemplate').addEventListener('click',async()=>{try{const value=JSON.parse($('templateEditor').value),id=value.template_id;if(!openedEditable)throw new Error('Las plantillas incluidas no se pueden borrar.');if(!confirm(`¿Borrar definitivamente la plantilla “${id}”?`))return;await api(`/templates/${encodeURIComponent(id)}`,{method:'DELETE'});$('templateEditor').value='';editorTemplateId.value='';await loadTemplates();status(`Plantilla “${id}” borrada.`,'success')}catch(e){status(e.message,'error')}});
+function downloadJson(value,name){const blob=new Blob([JSON.stringify(value,null,2)],{type:'application/json'}),link=document.createElement('a');link.href=URL.createObjectURL(blob);link.download=name;link.click();URL.revokeObjectURL(link.href)}
+$('exportTemplate').addEventListener('click',()=>{const value=validateJson(false);if(value)downloadJson(value,`${value.template_id||'plantilla'}.json`)});
+$('importTemplate').addEventListener('click',()=>$('importFile').click());
+$('importFile').addEventListener('change',async()=>{try{const value=JSON.parse(await $('importFile').files[0].text());editorTemplateId.value='';showJson(value);status('Archivo importado. Revísalo y pulsa Guardar.','success')}catch(e){status(`No se pudo importar: ${e.message}`,'error')}finally{$('importFile').value=''}});
+$('ocrForm').addEventListener('submit',async event=>{event.preventDefault();$('result').value='Procesando…';$('downloadBtn').disabled=true;try{const payload=new FormData(),selected=templateId.value;let endpoint;if($('sourceType').value==='file_upload'){const file=$('fileInput').files[0];if(!file)throw new Error('Selecciona un PDF.');payload.append('file',file,file.name);const query=new URLSearchParams();if(selected==='__none__')query.set('auto_detect_template','false');else if(selected!=='__auto__')query.set('template_id',selected);endpoint=`/ocr${query.size?'?'+query:''}`;}else{payload.append('source_type',$('sourceType').value);payload.append('source_value',$('sourceValue').value.trim());endpoint='/ocr/source';if(selected==='__none__')payload.append('auto_detect_template','false');else if(selected!=='__auto__')payload.append('template_id',selected);}const response=await fetch(`${basePath}${endpoint}`,{method:'POST',body:payload,headers:headers()}),data=await response.json();if(!response.ok)throw new Error(data.detail||'Error inesperado');latestJson=data;$('result').value=JSON.stringify(data,null,2);$('downloadBtn').disabled=false}catch(e){$('result').value=`Error: ${e.message}`}});
+$('downloadBtn').addEventListener('click',()=>latestJson&&downloadJson(latestJson,'resultado_ocr.json'));
+</script>
+</body>
+</html>

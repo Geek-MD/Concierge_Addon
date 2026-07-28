@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.0
+
+- Added a service-template editor tab with blank and generic starting points, JSON import/export, formatting, opening, saving, and deletion.
+- Added authenticated persistent CRUD endpoints for user templates while protecting bundled templates from modification.
+- Added JSON syntax highlighting and validation feedback with line, column, context, and repair suggestions.
+
 ## 0.4.5
 
 - Fixed hot-water consumption extraction when OCR recognizes the `Agua Caliente` data row but omits the spanning `Consumos Generales` table heading.

@@ -29,6 +29,7 @@ The runtime dependencies explicitly include `paddlepaddle` to ensure `paddleocr`
   - `run.sh`: API startup script.
   - `requirements.txt`: Python dependencies.
   - `app/main.py`: REST API (`/health`, `/status`, `/templates`, `/ocr`, `/ocr/source`) and Web UI (`/`).
+  - `app/web_ui.html`: OCR interface and persistent service-template editor.
 
 ## Usage
 
@@ -110,7 +111,15 @@ The same template-selection behavior used by `/ocr` also applies here: explicit 
 
 ### `GET /templates`
 
-Lists built-in template IDs available for `template_id`.
+Lists built-in and user-created template IDs available for `template_id`. The Web UI's
+**Plantillas de servicios** tab can create a blank template, start from a generic example,
+open, import, export, format, save, and delete templates. Built-in templates can be opened
+and copied under a new ID, but cannot be overwritten or deleted.
+
+User templates are persisted as JSON in `/data/templates` (or the directory configured by
+`TEMPLATE_STORAGE_DIR`) and remain available after add-on restarts. The authenticated CRUD
+endpoints are `GET /templates/{template_id}`, `PUT /templates/{template_id}`, and
+`DELETE /templates/{template_id}`.
 
 ### `GET /status`
 
