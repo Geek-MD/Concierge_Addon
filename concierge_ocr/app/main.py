@@ -20,7 +20,7 @@ from pdf2image import convert_from_bytes
 from paddleocr import PaddleOCR
 from pydantic import BaseModel
 
-APP_VERSION = "0.4.3"
+APP_VERSION = "0.4.4"
 
 app = FastAPI(title="Concierge OCR API", version=APP_VERSION)
 logger = logging.getLogger("concierge_ocr.api")
@@ -700,11 +700,14 @@ def _apply_template(ocr_payload: dict[str, Any], template: dict[str, Any]) -> di
                     if anchor_line is None:
                         anchor_line = first_fixed_match["line"] if first_fixed_match else None
                     strategy = str(locator.get("strategy", "nearest_right_or_below"))
+                    variable_line = None
+                    variable_text = None
+                    row_lines: list[dict[str, Any]] = []
                     if strategy == "same_row_right_join" and anchor_line is not None:
                         row_lines = _find_variable_values_on_row(anchor_line, flattened_lines)
                         variable_line = row_lines[0] if row_lines else None
                         variable_text = " ".join(line["text"] for line in row_lines) or None
-                    else:
+                    elif strategy != "same_row_right_join":
                         value_type = str(box.get("value_type", "string"))
                         variable_line = _find_variable_value(
                             anchor_line,
