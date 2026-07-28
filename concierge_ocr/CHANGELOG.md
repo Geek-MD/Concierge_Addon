@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.3
+
+- Fixed extraction of the billing period and department from the `Nota de Cobro` row.
+- Added typed table-cell filtering and anchored the provision amount to the percentage cell immediately to its left.
+- Restored hot-water readings, consumption, unit value, total, and consumption subtotal extraction.
+- Renamed `subtotal_recarga` to the correct `subtotal_recargos` output field.
+
 ## 0.4.2
 
 - Fixed table value extraction by matching OCR boxes on the same visual row instead of requiring an identical OCR sequence index.

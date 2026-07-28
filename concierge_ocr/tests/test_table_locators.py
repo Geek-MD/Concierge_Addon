@@ -1,10 +1,12 @@
 import ast
+import json
 import unittest
 from pathlib import Path
 from typing import Any
 
 
 MAIN_FILE = Path(__file__).parents[1] / "app" / "main.py"
+TEMPLATE_FILE = Path(__file__).parents[1] / "app" / "templates" / "coe_administraciones.json"
 
 
 def load_functions(*names: str) -> dict[str, Any]:
@@ -16,12 +18,17 @@ def load_functions(*names: str) -> dict[str, Any]:
         if isinstance(node, ast.FunctionDef) and node.name in names
     ]
     module = ast.Module(body=selected, type_ignores=[])
-    namespace: dict[str, Any] = {"Any": Any}
+    namespace: dict[str, Any] = {"Any": Any, "re": __import__("re")}
     exec(compile(module, str(MAIN_FILE), "exec"), namespace)
     return namespace
 
 
-HELPERS = load_functions("_calculate_candidate_priority", "_find_variable_value")
+HELPERS = load_functions(
+    "_calculate_candidate_priority",
+    "_find_variable_value",
+    "_find_variable_values_on_row",
+    "_variable_value_matches",
+)
 
 
 def line(index: int, x: float, y: float, text: str, *, used: bool = False) -> dict[str, Any]:
@@ -73,6 +80,55 @@ class TableLocatorTests(unittest.TestCase):
             anchor, value, "same_line_right", 2
         )
         self.assertEqual(priority, (0, 0.0))
+
+    def test_currency_locator_skips_a_nearby_text_label(self) -> None:
+        percentage = line(37, 350, 400, "5,00%", used=True)
+        wrong_label = line(38, 100, 402, "Subtotal Departamento")
+        amount = line(39, 600, 400, "$6.734")
+
+        result = HELPERS["_find_variable_value"](
+            percentage,
+            [percentage, wrong_label, amount],
+            {"strategy": "same_line_right"},
+            1,
+            "currency",
+        )
+
+        self.assertIs(result, amount)
+
+    def test_same_row_join_collects_note_month_year_and_department(self) -> None:
+        anchor = line(10, 100, 200, "Nota de Cobro")
+        period = line(11, 300, 200, "Julio 2026")
+        department = line(12, 500, 201, "Depto. 404")
+        next_row = line(13, 300, 240, "Copropietario")
+
+        result = HELPERS["_find_variable_values_on_row"](
+            anchor, [anchor, period, department, next_row]
+        )
+
+        self.assertEqual(result, [period, department])
+
+    def test_value_type_shapes(self) -> None:
+        matches = HELPERS["_variable_value_matches"]
+        self.assertTrue(matches("$ 6.734", "currency"))
+        self.assertTrue(matches("123,456", "numeric"))
+        self.assertFalse(matches("Subtotal Departamento", "currency"))
+
+    def test_provision_amount_is_anchored_to_percentage_cell(self) -> None:
+        template = json.loads(TEMPLATE_FILE.read_text(encoding="utf-8"))
+        breakdown = next(
+            section
+            for section in template["sections"]
+            if section["id"] == "tabla_desglose_departamento"
+        )
+        provision = next(
+            row for row in breakdown["lines"] if row["id"] == "linea_provision_fondos"
+        )
+        amount = next(
+            box for box in provision["boxes"] if box.get("key") == "provision_fondos_monto"
+        )
+
+        self.assertEqual(amount["locator"]["anchor_key"], "provision_fondos_porcentaje")
 
 
 if __name__ == "__main__":
