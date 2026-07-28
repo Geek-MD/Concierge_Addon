@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.2
+
+- Fixed table value extraction by matching OCR boxes on the same visual row instead of requiring an identical OCR sequence index.
+- Added regression coverage for multi-column rows and adjacent-row rejection.
+
 ## 0.4.1
 
 - Added the `generate_api_token` add-on option to create a secure token from the add-on logs before the API starts.
