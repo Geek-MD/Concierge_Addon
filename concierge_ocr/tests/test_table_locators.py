@@ -31,6 +31,9 @@ HELPERS = load_functions(
 )
 
 
+APPLY_TEMPLATE = load_functions("_apply_template")["_apply_template"]
+
+
 def line(index: int, x: float, y: float, text: str, *, used: bool = False) -> dict[str, Any]:
     return {
         "page": 1,
@@ -45,6 +48,39 @@ def line(index: int, x: float, y: float, text: str, *, used: bool = False) -> di
 
 
 class TableLocatorTests(unittest.TestCase):
+    def test_same_row_join_without_anchor_returns_none(self) -> None:
+        APPLY_TEMPLATE.__globals__.update(
+            {
+                "_flatten_ocr_lines": lambda payload, config: [],
+                "_section_anchor_score": lambda section, lines, config: (1.0, 1),
+                "_find_best_fixed_match": lambda *args, **kwargs: None,
+                "_find_variable_values_on_row": lambda anchor, lines: [],
+                "_variable_value_matches": lambda value, value_type: True,
+            }
+        )
+        template = {
+            "sections": [
+                {
+                    "id": "header",
+                    "lines": [
+                        {
+                            "boxes": [
+                                {
+                                    "role": "variable",
+                                    "key": "description",
+                                    "locator": {"strategy": "same_row_right_join"},
+                                }
+                            ]
+                        }
+                    ],
+                }
+            ]
+        }
+
+        result = APPLY_TEMPLATE({"page_count": 1}, template)
+
+        self.assertIsNone(result["sections"]["header"]["description"])
+
     def test_same_line_right_uses_visual_row_not_ocr_sequence_index(self) -> None:
         anchor = line(30, 100, 400, "Gasto Común")
         percentage = line(31, 350, 402, "0,95110%")

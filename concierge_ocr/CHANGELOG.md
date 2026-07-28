@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.4
+
+- Fixed template extraction failures when a `same_row_right_join` field has no matching anchor.
+- Missing joined-row values now return `null` instead of causing an HTTP 500 response.
+
 ## 0.4.3
 
 - Fixed extraction of the billing period and department from the `Nota de Cobro` row.
